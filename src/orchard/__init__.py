@@ -1,5 +1,6 @@
 """Orchard: persistent hierarchical trees over a fixed document corpus."""
 
+from orchard.builder import OrchardBuilder
 from orchard.cuts import (
     build_dynamic_cut,
     cut_partition_item_ids,
@@ -29,6 +30,7 @@ from orchard.identity import (
 )
 from orchard.orchard import Orchard
 from orchard.schemas import ARTIFACT_SCHEMA_VERSION, DOCUMENT_SCHEMA_VERSION
+from orchard.taxonomy import StubTaxonomy
 from orchard.tree import Tree
 from orchard.viz import (
     cut_to_plotly_structure,
@@ -47,7 +49,9 @@ __all__ = [
     "InvalidIdentityError",
     "InvalidLinkageError",
     "Orchard",
+    "OrchardBuilder",
     "OrchardError",
+    "StubTaxonomy",
     "Tree",
     "UnknownLabelSetError",
     "UnknownNodeError",
