@@ -1,0 +1,74 @@
+{
+  "schema_version": "orchard_taxonomy_definition_v1",
+  "name": "function",
+  "taxonomy_version": "orchard_taxonomy_v1",
+  "structure": "flat",
+  "provenance": "genericized from taxonomy_v0 functional labels; cues only; no AppWorld runtime",
+  "label_order": [
+    "func.retrieve",
+    "func.search",
+    "func.create",
+    "func.update",
+    "func.delete",
+    "func.communicate",
+    "func.authorize",
+    "func.respond",
+    "func.execute"
+  ],
+  "labels": [
+    {
+      "label_id": "func.retrieve",
+      "name": "Retrieve",
+      "definition": "Read, show, list, download, or inspect existing information.",
+      "cues": ["show", "get", "download", "list", "read", "inspect"]
+    },
+    {
+      "label_id": "func.search",
+      "name": "Search",
+      "definition": "Find resources matching a query or filter.",
+      "cues": ["search", "find", "query", "mentioning"]
+    },
+    {
+      "label_id": "func.create",
+      "name": "Create",
+      "definition": "Create, add, upload, write, or initiate a resource.",
+      "cues": ["create", "add", "upload", "write", "initiate", "schedule"]
+    },
+    {
+      "label_id": "func.update",
+      "name": "Update",
+      "definition": "Modify or restore state.",
+      "cues": ["update", "move", "mark", "assign", "attach", "apply", "clear", "complete"]
+    },
+    {
+      "label_id": "func.delete",
+      "name": "Delete",
+      "definition": "Delete, remove, or detach a resource.",
+      "cues": ["delete", "remove", "unlabel"]
+    },
+    {
+      "label_id": "func.communicate",
+      "name": "Communicate",
+      "definition": "Send, post, reply, forward, or otherwise communicate.",
+      "cues": ["send", "post", "reply", "forward", "email"]
+    },
+    {
+      "label_id": "func.authorize",
+      "name": "Authenticate / authorize",
+      "definition": "Establish, verify, reset, or end identity access.",
+      "cues": ["login", "logout", "signup", "verify", "reset"]
+    },
+    {
+      "label_id": "func.respond",
+      "name": "Respond / react",
+      "definition": "Approve, accept, review, like, subscribe, or reject.",
+      "cues": ["approve", "accept", "review", "like", "unlike", "subscribe"]
+    },
+    {
+      "label_id": "func.execute",
+      "name": "Execute / control",
+      "definition": "Run a task or control playback, alarms, queues, or system behavior.",
+      "cues": ["play", "pause", "stop", "record", "compress", "decompress", "execute"]
+    }
+  ]
+}

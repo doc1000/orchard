@@ -28,9 +28,16 @@ from orchard.identity import (
     membership_hash,
     validate_tree_id,
 )
+from orchard.labels import import_labels, label_intrinsic
 from orchard.orchard import Orchard
 from orchard.schemas import ARTIFACT_SCHEMA_VERSION, DOCUMENT_SCHEMA_VERSION
-from orchard.taxonomy import StubTaxonomy
+from orchard.taxonomy import (
+    DomainTaxonomy,
+    FunctionTaxonomy,
+    StubTaxonomy,
+    TaxonomyModel,
+    default_taxonomies,
+)
 from orchard.tree import Tree
 from orchard.viz import (
     cut_to_plotly_structure,
@@ -45,13 +52,16 @@ __all__ = [
     "DOCUMENT_SCHEMA_VERSION",
     "CorpusMutationUnsupportedError",
     "Document",
+    "DomainTaxonomy",
     "DuplicateItemIdError",
+    "FunctionTaxonomy",
     "InvalidIdentityError",
     "InvalidLinkageError",
     "Orchard",
     "OrchardBuilder",
     "OrchardError",
     "StubTaxonomy",
+    "TaxonomyModel",
     "Tree",
     "UnknownLabelSetError",
     "UnknownNodeError",
@@ -61,8 +71,11 @@ __all__ = [
     "canonical_node_id",
     "cut_partition_item_ids",
     "cut_to_plotly_structure",
+    "default_taxonomies",
     "ensure_unique_item_ids",
     "generate_item_id",
+    "import_labels",
+    "label_intrinsic",
     "linkage_for_canonical_subtree",
     "membership_hash",
     "orchard_plotly_structures",

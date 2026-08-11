@@ -18,8 +18,10 @@ from orchard.document import Document
 from orchard.exceptions import InvalidIdentityError
 from orchard.identity import ensure_unique_item_ids, validate_tree_id
 from orchard.orchard import Orchard
-from orchard.taxonomy import Taxonomy
+from orchard.taxonomy import Taxonomy, default_taxonomies
 from orchard.tree import Tree
+
+_UNSET: Any = object()
 
 
 def normalize_documents(
@@ -49,13 +51,15 @@ class OrchardBuilder:
     """Build an Orchard from a finite corpus.
 
     Branching:
+    - default / ``None`` taxonomies → packaged Domain + Function trees.
     - ``taxonomies == []`` → one ``semantic`` tree (default TF-IDF cosine path).
-    - non-empty ``taxonomies`` → one named tree per taxonomy (no fused default tree).
+    - explicit non-empty ``taxonomies`` → one named tree per taxonomy.
 
+    No fused Domain+Function+semantic default tree.
     Public construction verb is ``build`` (not ``fit_transform``).
     """
 
-    taxonomies: list[Taxonomy] = field(default_factory=list)
+    taxonomies: Any = field(default=_UNSET)
     embedding_backend: Any | None = None
     linkage_method: str = "average"
     semantic_signed_cosine: bool = False
@@ -68,6 +72,10 @@ class OrchardBuilder:
             raise InvalidIdentityError(
                 "taxonomy_similarity must be 'jensen_shannon' or 'cosine'"
             )
+        if self.taxonomies is _UNSET or self.taxonomies is None:
+            self.taxonomies = default_taxonomies()
+        else:
+            self.taxonomies = list(self.taxonomies)
         names = [validate_tree_id(taxonomy.name) for taxonomy in self.taxonomies]
         if len(names) != len(set(names)):
             raise InvalidIdentityError("taxonomy names must be unique tree ids")

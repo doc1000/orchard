@@ -21,7 +21,7 @@ def test_tiny_corpus_no_taxonomies_builds_semantic_tree() -> None:
 
 
 def test_builder_accepts_raw_strings() -> None:
-    orchard = OrchardBuilder().build(
+    orchard = OrchardBuilder(taxonomies=[]).build(
         [
             "alpha calendar reminder scheduling",
             "bravo email messaging notes",

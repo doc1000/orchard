@@ -1,0 +1,88 @@
+{
+  "schema_version": "orchard_taxonomy_definition_v1",
+  "name": "domain",
+  "taxonomy_version": "orchard_taxonomy_v1",
+  "structure": "flat",
+  "provenance": "genericized from taxonomy_v0 domain labels; cues only; no AppWorld runtime",
+  "label_order": [
+    "domain.identity",
+    "domain.commerce",
+    "domain.finance",
+    "domain.communication",
+    "domain.files",
+    "domain.work",
+    "domain.media",
+    "domain.notes",
+    "domain.phone",
+    "domain.documentation",
+    "domain.system_orchestration"
+  ],
+  "labels": [
+    {
+      "label_id": "domain.identity",
+      "name": "Identity and account",
+      "definition": "Accounts, profiles, credentials, addresses, and authentication.",
+      "cues": ["account", "profile", "password", "address", "verification", "code"]
+    },
+    {
+      "label_id": "domain.commerce",
+      "name": "Commerce",
+      "definition": "Products, carts, orders, wish lists, reviews, and promotions.",
+      "cues": ["product", "cart", "order", "wish", "promo", "review", "gift"]
+    },
+    {
+      "label_id": "domain.finance",
+      "name": "Payments and finance",
+      "definition": "Payments, cards, balances, expenses, receipts, and transactions.",
+      "cues": ["payment", "card", "balance", "expense", "receipt", "transaction", "budget"]
+    },
+    {
+      "label_id": "domain.communication",
+      "name": "Messages and communication",
+      "definition": "Email, threads, drafts, messages, comments, notifications, and calls.",
+      "cues": ["email", "thread", "draft", "message", "comment", "notification", "call", "messaging"]
+    },
+    {
+      "label_id": "domain.files",
+      "name": "Files and storage",
+      "definition": "Files, directories, attachments, and storage operations.",
+      "cues": ["file", "directory", "attachment", "storage", "document", "documents"]
+    },
+    {
+      "label_id": "domain.work",
+      "name": "Tasks and projects",
+      "definition": "Tasks, projects, sections, labels, assignments, and collaboration groups.",
+      "cues": ["task", "project", "section", "label", "group", "invite", "proposal"]
+    },
+    {
+      "label_id": "domain.media",
+      "name": "Music and media",
+      "definition": "Songs, albums, artists, playlists, libraries, queues, and playback.",
+      "cues": ["song", "album", "artist", "playlist", "library", "queue", "music"]
+    },
+    {
+      "label_id": "domain.notes",
+      "name": "Notes and authored content",
+      "definition": "Notes and their textual content.",
+      "cues": ["note", "notes", "content", "summary"]
+    },
+    {
+      "label_id": "domain.phone",
+      "name": "Personal device and contacts",
+      "definition": "Contacts, alarms, reminders, calendar, and device information.",
+      "cues": ["contact", "alarm", "text", "voice", "phone", "date", "time", "calendar", "reminder", "scheduling"]
+    },
+    {
+      "label_id": "domain.documentation",
+      "name": "Documentation object",
+      "definition": "Documentation as the acted-on object for corpus-navigation utilities.",
+      "cues": ["doc", "documentation", "description"]
+    },
+    {
+      "label_id": "domain.system_orchestration",
+      "name": "System orchestration",
+      "definition": "Cross-system coordination when no acted-on business object is identifiable.",
+      "cues": ["orchestration", "system"]
+    }
+  ]
+}
