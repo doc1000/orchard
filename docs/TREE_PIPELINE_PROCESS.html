@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AppWorld Tool-Tree Pipeline Process</title>
+  <style>
+    :root {
+      --bg: #f7f4ef;
+      --ink: #1d1a16;
+      --muted: #5c564c;
+      --line: #c9c0b2;
+      --card: #fffdf9;
+      --ingest: #2f5d50;
+      --enrich: #7a4e2d;
+      --sim: #3d4f7a;
+      --tree: #6b3f5b;
+      --cut: #8a5a1e;
+      --viz: #1f4d63;
+      --gate: #8b2e2e;
+      --ok: #245c3a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%, #efe7d8 0%, transparent 40%),
+        radial-gradient(circle at 90% 10%, #e4ece8 0%, transparent 35%),
+        var(--bg);
+      font: 16px/1.5 "Segoe UI", "Helvetica Neue", sans-serif;
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 4rem;
+    }
+    h1 {
+      font-size: 2rem;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.4rem;
+    }
+    .lede {
+      color: var(--muted);
+      max-width: 70ch;
+      margin-bottom: 2rem;
+    }
+    h2 {
+      margin: 2.25rem 0 0.75rem;
+      font-size: 1.25rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 0.35rem;
+    }
+    h3 { margin: 1.25rem 0 0.5rem; font-size: 1.05rem; }
+    p, li { color: var(--ink); }
+    .muted { color: var(--muted); }
+    code, .path {
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 0.9em;
+      background: #efe9df;
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+    .flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      margin: 1rem 0 1.5rem;
+    }
+    .stage {
+      border: 1px solid var(--line);
+      border-left: 6px solid var(--ink);
+      background: var(--card);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      box-shadow: 0 1px 0 rgba(29, 26, 22, 0.04);
+    }
+    .stage.ingest { border-left-color: var(--ingest); }
+    .stage.enrich { border-left-color: var(--enrich); }
+    .stage.sim { border-left-color: var(--sim); }
+    .stage.tree { border-left-color: var(--tree); }
+    .stage.cut { border-left-color: var(--cut); }
+    .stage.viz { border-left-color: var(--viz); }
+    .stage.gate { border-left-color: var(--gate); background: #fff8f6; }
+    .stage.consumer { border-left-color: var(--ok); }
+    .stage-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+    .stage-title {
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 650;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.15rem 0.55rem;
+      color: var(--muted);
+      background: #f3eee5;
+    }
+    .arrow {
+      align-self: center;
+      color: var(--muted);
+      font-size: 1.35rem;
+      line-height: 1;
+      user-select: none;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 0.75rem;
+    }
+    .tile {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--card);
+      padding: 0.85rem 0.95rem;
+    }
+    .tile strong { display: block; margin-bottom: 0.25rem; }
+    .split {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 0.75rem;
+      margin: 0.75rem 0;
+    }
+    .branch {
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      padding: 0.75rem 0.9rem;
+      background: #fbf8f2;
+    }
+    .branch.selected {
+      border-style: solid;
+      border-color: #2f5d50;
+      background: #f1f7f4;
+    }
+    .branch .label {
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+    ul.compact { margin: 0.35rem 0 0; padding-left: 1.1rem; }
+    ul.compact li { margin: 0.15rem 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      font-size: 0.92rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.55rem 0.7rem;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th { background: #efe9df; font-weight: 650; }
+    tr:last-child td { border-bottom: 0; }
+    .note {
+      border-left: 4px solid #8a5a1e;
+      background: #fff8ea;
+      padding: 0.75rem 0.9rem;
+      border-radius: 0 8px 8px 0;
+      margin: 1rem 0;
+    }
+    footer {
+      margin-top: 2.5rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>AppWorld Tool-Tree Pipeline</h1>
+    <p class="lede">
+      Process map for the hierarchical tool-tree MVP in
+      <code>tool-tree-demo</code>. This document describes how official AppWorld
+      API docs become fused similarity matrices, six binary linkage trees, three
+      selected trees, dynamic cluster cuts, and Plotly structural artifacts.
+      Existing artifacts live under <span class="path">artifacts/appworld/</span>
+      (local/gitignored). Exploratory notebook:
+      <span class="path">notebooks/tree_pipeline_exploration.ipynb</span>.
+    </p>
+
+    <h2>End-to-end flow</h2>
+    <div class="flow">
+      <div class="stage ingest">
+        <div class="stage-head">
+          <div class="stage-title">1. Ingest — Phase 1</div>
+          <span class="badge">457 tools</span>
+        </div>
+        <p>Load official AppWorld API docs via installed PyPI package
+          <code>appworld==0.1.3.post1</code>. Normalize to
+          <code>ToolRecord</code> with stable <code>tool_id = app_name.api_name</code>.</p>
+        <ul class="compact">
+          <li>Code: <code>src/tool_tree_demo/loader.py</code>, <code>artifacts.py</code></li>
+          <li>CLI: <code>uv run tool-tree load-appworld</code></li>
+          <li>Artifact: <span class="path">artifacts/appworld/run-a/tools.jsonl</span> + <code>manifest.json</code></li>
+        </ul>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="stage enrich">
+        <div class="stage-head">
+          <div class="stage-title">2. Enrich — Phase 2A / 2B</div>
+          <span class="badge">keywords + taxonomies</span>
+        </div>
+        <p>Keyword enrichment (LLM, cached) and transformer classification into
+          approved flat <code>taxonomy_v0</code> functional and domain distributions.</p>
+        <ul class="compact">
+          <li>Adapters: <code>adapters/doc_enrichment_bridge.py</code>, <code>adapters/transformer_classifier_bridge.py</code></li>
+          <li>Artifacts:
+            <span class="path">phase2b/keywords/enrichments.jsonl</span>,
+            <span class="path">phase2b/classification/classifications.jsonl</span>,
+            <span class="path">phase2b/taxonomies/taxonomy_v0/*.json</span>
+          </li>
+          <li>Human gate G2: taxonomy definitions approved as immutable <code>taxonomy_v0</code></li>
+        </ul>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="stage sim">
+        <div class="stage-head">
+          <div class="stage-title">3. Similarity layers + fusion — Phase 3 / 3B</div>
+          <span class="badge">independent matrices</span>
+        </div>
+        <p>Compute one normalized pairwise similarity matrix per feature over the
+          same 457 tool IDs. Fuse with named weight profiles (never concatenate
+          heterogeneous vectors).</p>
+        <div class="grid-2" style="margin-top:0.6rem">
+          <div class="tile">
+            <strong>Feature layers</strong>
+            description embedding · functional taxonomy · domain taxonomy ·
+            keywords (TF-IDF / Jaccard) · app-family exact match
+          </div>
+          <div class="tile">
+            <strong>Phase 3B reduced profiles</strong>
+            <code>functional_dominant</code>,
+            <code>domain_dominant</code>,
+            <code>mixed_low_app</code>
+            each as <code>raw_convex</code> and <code>variance_calibrated</code>
+          </div>
+        </div>
+        <ul class="compact">
+          <li>Config: <span class="path">config/phase3b_reduced_profiles.v1.json</span></li>
+          <li>Artifacts: <span class="path">phase3b/profiles/*.npz</span> (457×457)</li>
+        </ul>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="stage tree">
+        <div class="stage-head">
+          <div class="stage-title">4. Hierarchical binary trees — Phase 4A</div>
+          <span class="badge">6 trees</span>
+        </div>
+        <p>Average-linkage (SciPy) on <code>D = 1 − S</code> for each fused profile.
+          Emit SciPy Z-matrix + canonical membership-hashed binary tree
+          (913 nodes = 457 leaves + 456 internals). Optional coarse/medium/fine
+          packed presentation views.</p>
+        <ul class="compact">
+          <li>Adapter: <code>adapters/linkage_cluster_packer.py</code>
+            (from <code>text_analyzer/.../cluster_packer.ipynb</code>)</li>
+          <li>Artifacts: <span class="path">phase4a/trees/&lt;profile&gt;/{linkage,canonical_tree,packed_*}.json</span></li>
+          <li>Diagnostics: <span class="path">phase4a/structural_diagnostics.json</span></li>
+        </ul>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="stage gate">
+        <div class="stage-head">
+          <div class="stage-title">5. Select one tree per family</div>
+          <span class="badge">3 of 6</span>
+        </div>
+        <p>For each family, choose raw vs calibrated by joint cophenetic correlation
+          and medium-cut size balance. Recorded in
+          <code>phase4a_manifest.json["recommended_for_enrichment"]</code>.</p>
+        <div class="split">
+          <div class="branch selected">
+            <div class="label">Selected (carry forward)</div>
+            <ul class="compact">
+              <li><code>functional_dominant_raw_convex</code></li>
+              <li><code>domain_dominant_variance_calibrated</code></li>
+              <li><code>mixed_low_app_variance_calibrated</code></li>
+            </ul>
+          </div>
+          <div class="branch">
+            <div class="label">Built but not selected</div>
+            <ul class="compact">
+              <li><code>functional_dominant_variance_calibrated</code></li>
+              <li><code>domain_dominant_raw_convex</code></li>
+              <li><code>mixed_low_app_raw_convex</code></li>
+            </ul>
+            <p class="muted" style="margin:0.4rem 0 0">Still on disk under Phase 4A for comparison.</p>
+          </div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="stage enrich">
+        <div class="stage-head">
+          <div class="stage-title">6. Intrinsic labels — Phase 4B1</div>
+          <span class="badge">cached LLM</span>
+        </div>
+        <p>Membership-keyed intrinsic summaries for internal nodes (concise v3 run).
+          Contextual contrast prose is deferred (Phase 5D / formerly 4B2).</p>
+        <ul class="compact">
+          <li>Artifact: <span class="path">phase4b1/intrinsic-run-v3/successful_records.jsonl</span> (812 summaries)</li>
+          <li>Occurrence refs: <span class="path">phase4b1/intrinsic_occurrence_references.jsonl</span></li>
+        </ul>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="stage cut">
+        <div class="stage-head">
+          <div class="stage-title">7. Dynamic cluster cuts — Phase 5A</div>
+          <span class="badge">3 trees × 3 cuts</span>
+        </div>
+        <p>Join intrinsic labels + leaf payloads onto the three selected binary trees,
+          then cut each into nested hierarchical cluster trees that only expose
+          existing canonical memberships.</p>
+        <ul class="compact">
+          <li>Adapter: <code>adapters/dynamic_tree_cutter.py</code>
+            (<code>build_dynamic_cut()</code> — SciPy top cut + recursive width-bounded subcut</li>
+          <li>Cuts: <code>cluster_count_10</code>, <code>cluster_count_25</code>, <code>distance_half_root</code></li>
+          <li>Config: <span class="path">config/phase5a_intrinsic_trees.v1.json</span></li>
+          <li>Artifact: <span class="path">phase5a/trees/&lt;tree&gt;/intrinsic_labeled_tree.json</span>
+            (self-contained: linkage, nodes, labels, embedded <code>dynamic_cuts</code>)</li>
+        </ul>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="stage viz">
+        <div class="stage-head">
+          <div class="stage-title">8. Plotly nested structures — Phase 5B</div>
+          <span class="badge">9 structures</span>
+        </div>
+        <p>Convert each embedded cut to Plotly treemap row data
+          (<code>ids</code> / <code>parents</code> / <code>labels</code> / <code>values</code>)
+          without reconstructing linkage or inventing memberships.</p>
+        <ul class="compact">
+          <li>Adapter: <code>adapters/plotly_nested_structure.py</code> · <code>convert_phase5a_cut()</code></li>
+          <li>Artifact: <span class="path">phase5b/structures/&lt;tree&gt;/&lt;cut&gt;/plotly_nested_structure.json</span></li>
+          <li>Diagnostics: <span class="path">phase5b/diagnostics/structural_coherence.json</span></li>
+        </ul>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="stage viz">
+        <div class="stage-head">
+          <div class="stage-title">9. Local label review UI — Phase 5C</div>
+          <span class="badge">G5C gate</span>
+        </div>
+        <p>Offline D3 outline over all nine Phase 5B structures. Human flags
+          intrinsic label quality; reviews directory currently empty.</p>
+        <ul class="compact">
+          <li>Serve: <code>uv run tool-tree serve-phase5c</code></li>
+          <li>Bundle: <span class="path">phase5c/app/data/review_bundle.json</span></li>
+        </ul>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="stage consumer">
+        <div class="stage-head">
+          <div class="stage-title">Downstream consumer — Tool retrieval</div>
+          <span class="badge">uses Phase 5A</span>
+        </div>
+        <p>Retrieval eval (TR0–TR5) loads the Phase 5A mixed tree directly
+          (<code>mixed_low_app_variance_calibrated</code> at
+          <code>cluster_count_10</code>), not the Plotly JSON. Markdown outlines for
+          domain/function trees are under
+          <span class="path">tool_retrieval/initial_context/</span>.</p>
+      </div>
+    </div>
+
+    <h2>Weight profiles (Phase 3B)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Profile</th>
+          <th>domain</th>
+          <th>functional</th>
+          <th>keyword</th>
+          <th>description</th>
+          <th>app</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>functional_dominant</code></td>
+          <td>0.12</td><td><strong>0.45</strong></td><td>0.15</td><td>0.25</td><td>0.03</td>
+        </tr>
+        <tr>
+          <td><code>domain_dominant</code></td>
+          <td><strong>0.45</strong></td><td>0.15</td><td>0.14</td><td>0.23</td><td>0.03</td>
+        </tr>
+        <tr>
+          <td><code>mixed_low_app</code></td>
+          <td>0.25</td><td>0.25</td><td>0.22</td><td>0.25</td><td>0.03</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Where “spoilage” can hide</h2>
+    <div class="note">
+      The repository does not document a named “spoiled trees” incident. When
+      trees look wrong, inspect these seams in order: fused matrix symmetry /
+      scale → linkage Z-matrix vs tool ID order → canonical membership hashes →
+      dynamic-cut fidelity to canonical nodes → Plotly row parent/id coherence →
+      intrinsic label content (often the human-visible failure mode even when
+      structure is valid).
+      <br /><br />
+      <strong>Load-time finding:</strong> Phase 5A files are newer than Phase 5B
+      (mtime ~2026-07-29 vs ~2026-07-26). Live
+      <code>validate_structure()</code> fails for
+      <code>mixed_low_app_variance_calibrated</code> on
+      <code>cluster_count_10</code> and <code>distance_half_root</code> because
+      one shared cluster’s cached Plotly <code>intrinsic_summary.scope_boundary</code>
+      no longer matches Phase 5A (display label still matches:
+      “Cross-platform logout”). Stored Phase 5B diagnostics still say
+      <code>passed</code>. Functional and domain trees validate cleanly.
+    </div>
+    <div class="grid-2">
+      <div class="tile">
+        <strong>Structural integrity</strong>
+        Phase 4A / 5A / 5B verifiers already assert leaf partition completeness,
+        membership-hash fidelity, and Plotly coherence. Use
+        <code>structural_diagnostics.json</code> and
+        <code>structural_coherence.json</code>.
+      </div>
+      <div class="tile">
+        <strong>Semantic / label quality</strong>
+        Intrinsic summaries can enumerate domains instead of abstracting them.
+        Structure may be fine while the outline “looks spoiled.” Phase 5C flags
+        exist for this review.
+      </div>
+    </div>
+
+    <h2>Key artifact index</h2>
+    <table>
+      <thead>
+        <tr><th>Stage</th><th>Path under <code>artifacts/appworld/</code></th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Corpus</td><td><code>run-a/tools.jsonl</code></td></tr>
+        <tr><td>Keywords</td><td><code>phase2b/keywords/enrichments.jsonl</code></td></tr>
+        <tr><td>Classifications</td><td><code>phase2b/classification/classifications.jsonl</code></td></tr>
+        <tr><td>Fused profiles</td><td><code>phase3b/profiles/*.npz</code></td></tr>
+        <tr><td>Binary trees</td><td><code>phase4a/trees/&lt;profile&gt;/canonical_tree.json</code></td></tr>
+        <tr><td>Selected + cuts</td><td><code>phase5a/trees/&lt;tree&gt;/intrinsic_labeled_tree.json</code></td></tr>
+        <tr><td>Plotly</td><td><code>phase5b/structures/&lt;tree&gt;/&lt;cut&gt;/plotly_nested_structure.json</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2>CLI regenerate map (do not run for exploration)</h2>
+    <p class="muted">Shown only so you can see which command produced which layer.
+      The exploratory notebook loads artifacts; it does not invoke these.</p>
+    <ul class="compact">
+      <li><code>generate-phase3b</code> → fused profiles</li>
+      <li><code>generate-phase4a</code> → six binary trees + recommendations</li>
+      <li><code>generate-phase5a</code> → three labeled trees + dynamic cuts</li>
+      <li><code>generate-phase5b</code> → nine Plotly structures</li>
+    </ul>
+
+    <footer>
+      Generated as a process overview for exploratory debugging. Source of truth
+      for status/checksums remains <code>docs/STATUS.md</code> and
+      <code>docs/DECISIONS.md</code>.
+    </footer>
+  </main>
+</body>
+</html>
