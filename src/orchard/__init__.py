@@ -1,5 +1,13 @@
 """Orchard: persistent hierarchical trees over a fixed document corpus."""
 
+from orchard.cuts import (
+    build_dynamic_cut,
+    cut_partition_item_ids,
+    linkage_for_canonical_subtree,
+    pack_canonical_tree,
+    validate_dynamic_cut,
+    walk_cut_json,
+)
 from orchard.document import Document
 from orchard.exceptions import (
     CorpusMutationUnsupportedError,
@@ -7,6 +15,9 @@ from orchard.exceptions import (
     InvalidIdentityError,
     InvalidLinkageError,
     OrchardError,
+    UnknownLabelSetError,
+    UnknownNodeError,
+    UnknownTreeError,
 )
 from orchard.identity import (
     assign_canonical_ids,
@@ -16,7 +27,14 @@ from orchard.identity import (
     membership_hash,
     validate_tree_id,
 )
+from orchard.orchard import Orchard
 from orchard.schemas import ARTIFACT_SCHEMA_VERSION, DOCUMENT_SCHEMA_VERSION
+from orchard.tree import Tree
+from orchard.viz import (
+    cut_to_plotly_structure,
+    orchard_plotly_structures,
+    validate_plotly_structure,
+)
 
 __version__ = "0.1.0"
 
@@ -28,12 +46,26 @@ __all__ = [
     "DuplicateItemIdError",
     "InvalidIdentityError",
     "InvalidLinkageError",
+    "Orchard",
     "OrchardError",
+    "Tree",
+    "UnknownLabelSetError",
+    "UnknownNodeError",
+    "UnknownTreeError",
     "assign_canonical_ids",
+    "build_dynamic_cut",
     "canonical_node_id",
+    "cut_partition_item_ids",
+    "cut_to_plotly_structure",
     "ensure_unique_item_ids",
     "generate_item_id",
+    "linkage_for_canonical_subtree",
     "membership_hash",
+    "orchard_plotly_structures",
+    "pack_canonical_tree",
+    "validate_dynamic_cut",
+    "validate_plotly_structure",
     "validate_tree_id",
+    "walk_cut_json",
     "__version__",
 ]

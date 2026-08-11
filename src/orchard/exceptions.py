@@ -21,3 +21,15 @@ class InvalidLinkageError(OrchardError, ValueError):
 
 class CorpusMutationUnsupportedError(OrchardError, NotImplementedError):
     """Raised when incremental insert/delete/mutation of a corpus is requested."""
+
+
+class UnknownTreeError(OrchardError, KeyError):
+    """Raised when a named tree is missing from an Orchard."""
+
+
+class UnknownNodeError(OrchardError, KeyError):
+    """Raised when a canonical node ID is not present in a tree."""
+
+
+class UnknownLabelSetError(OrchardError, KeyError):
+    """Raised when a named label set is missing."""
