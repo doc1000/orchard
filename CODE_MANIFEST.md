@@ -4,57 +4,59 @@ Indented map of the repository. Tags: `[proposed]` = planned, not yet implemente
 
 ## Root
 
-- `pyproject.toml` — package metadata; runtime deps `numpy`, `scipy`, `scikit-learn`; optional `dev` (`pytest`)
-- `README.md` — short package identity (expanded in Phase 4)
-- `CODE_MANIFEST.md` — this file; updated every phase
-- `docs/` — architecture, extraction plan, release gate (not the product docs site yet)
+- `pyproject.toml` — package metadata; runtime `numpy`/`scipy`/`scikit-learn`; optional `dev` (`pytest`, `ruff`)
+- `README.md` — what / install / minimal example / docs link
+- `CODE_MANIFEST.md` — this file (final Phase 4 map)
+- `docs/` — architecture, extraction plan, release gate
+- `docs/site/` — static multi-page docs site (open `index.html`; no build server)
 
 ## `src/orchard/` — installable library
 
-- `__init__.py` — package version and public exports
-  - `__version__`, `Document`, `Orchard`, `OrchardBuilder`, `Tree`
+- `__init__.py` — public exports
+  - `Document`, `Orchard`, `OrchardBuilder`, `Tree`
   - `DomainTaxonomy`, `FunctionTaxonomy`, `TaxonomyModel`, `StubTaxonomy`
-  - `label_intrinsic`, `import_labels` (no contrastive API)
-- `document.py` — canonical corpus record
-- `identity.py` — item / tree / canonical node IDs; SciPy index ↔ node ID map
-- `schemas.py` — schema / artifact version strings
-- `exceptions.py` — shared error types
-- `tree.py` — canonical binary tree; named label storage overlays
-- `orchard.py` — multi-tree owner; save/load
-- `builder.py` — `OrchardBuilder.build`
-  - default taxonomies → Domain + Function; `taxonomies=[]` → `semantic`
-- `taxonomy.py` — taxonomy protocol + cue/fit models + defaults
-  - `Taxonomy`, `TaxonomyModel`, `StubTaxonomy`, `DomainTaxonomy`, `FunctionTaxonomy`
-  - `default_taxonomies`, `TaxonomyModel.fit` / `save` / `load` / `transform`
-- `labels.py` — intrinsic heuristic + imported overlays
   - `label_intrinsic`, `import_labels`
+  - cut / viz / identity helpers
+- `document.py` — `Document`
+- `identity.py` — membership hashes, SciPy index ↔ canonical IDs
+- `schemas.py` — artifact / tree / cut / viz schema versions
+- `exceptions.py` — `OrchardError` hierarchy; corpus mutation unsupported
+- `tree.py` — `Tree.from_linkage`, subtree, named label storage
+- `orchard.py` — multi-tree `Orchard.from_trees` / `save` / `load`
+- `builder.py` — `OrchardBuilder.build` (defaults → domain+function; `[]` → semantic)
+- `taxonomy.py` — cue/fit taxonomy models + packaged defaults
+- `labels.py` — `label_intrinsic`, `import_labels` (no contrastive API)
 - `cuts.py` — dynamic cut, Steiner local-Z, packing, walk helpers
 - `viz.py` — Plotly-oriented nested payloads
-- `backends/` — offline TF-IDF + similarity/linkage cores
-- `assets/taxonomies/` — replaceable Domain/Function definition JSON + PROVENANCE
-  - `domain.json`, `function.json`
+- `backends/` — TF-IDF + similarity/linkage numeric cores
+- `adapters/` — directory / JSON / JSONL / CSV / records → `Document`
+  - `documents_from_*`, `load_documents`
+- `assets/taxonomies/` — replaceable Domain/Function JSON + PROVENANCE
 - `fixtures/` — generic reference corpus + sample linkage
 
-### Proposed (later phases)
+### Future (not shipped)
 
-- `adapters/` `[proposed]` — directory / JSON / JSONL / CSV → `Document`
-- `backends/sentence_transformers.py` `[proposed]` — optional neural embedding backend
-- contrastive labeling `[proposed]` — future only; not in public API
+- neural embedding backends `[proposed]`
+- contrastive labeling `[proposed]`
+- OpenAI intrinsic backend `[proposed]`
 
 ## `tests/`
 
-- `conftest.py` — shared document/tree/orchard fixtures
-- `test_identity_contracts.py` — Document defaults, unique IDs, node IDs, linkage map
-- `test_fixtures.py` — packaged fixtures load and match identity contracts
-- `test_orchard_persist.py` — multi-tree save/load identity
-- `test_cuts_and_subtrees.py` — partition + recursive subtree invariants
-- `test_external_linkage_and_viz.py` — external Z cut/plot/persist/labels
-- `test_builder_semantic.py` — no-taxonomy → `semantic` tree (offline)
-- `test_builder_taxonomies.py` — one tree per taxonomy; no fused default
-- `test_default_taxonomies.py` — Domain + Function defaults; replaceable artifacts
-- `test_labels_immutable_linkage.py` — intrinsic/imported labels; no contrastive API
+- `conftest.py` — shared fixtures
+- `test_identity_contracts.py` — identity / uniqueness
+- `test_fixtures.py` — packaged fixtures
+- `test_orchard_persist.py` — multi-tree save/load
+- `test_cuts_and_subtrees.py` — partition + subtree invariants
+- `test_external_linkage_and_viz.py` — external Z path + multi-tree viz
+- `test_builder_semantic.py` — no-taxonomy → `semantic`
+- `test_builder_taxonomies.py` — one tree per taxonomy
+- `test_default_taxonomies.py` — Domain + Function defaults
+- `test_labels_immutable_linkage.py` — label overlays immutable w.r.t. linkage
+- `test_adapters.py` — adapters → `build`
+- `test_readme_example.py` — README minimal example
+- `test_docs_site.py` — static docs pages + sidebar coverage
 
-### Proposed tests
+## `docs/site/` pages
 
-- `test_readme_example.py` `[proposed]` — README minimal example
-- adapter / docs-site tests `[proposed]` — Phase 4
+- Getting Started, Architecture, Documents, Taxonomies, Building Trees, Multiple Trees
+- Cuts & Views, Labels, Persistence, Visualization, Adapters, Extending Orchard

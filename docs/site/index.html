@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Getting Started — Orchard</title>
+  <link rel="stylesheet" href="assets/site.css" />
+</head>
+<body data-page="getting-started">
+  <div class="layout">
+<aside class="sidebar">
+  <div class="brand">Orchard<span>local hierarchical trees</span></div>
+  <nav class="nav">
+    <div class="nav-section">Start</div>
+    <a href="index.html" data-page="getting-started">Getting Started</a>
+    <a href="architecture.html" data-page="architecture">Architecture</a>
+    <div class="nav-section">Core</div>
+    <a href="documents.html" data-page="documents">Documents</a>
+    <a href="taxonomies.html" data-page="taxonomies">Taxonomies</a>
+    <a href="building-trees.html" data-page="building-trees">Building Trees</a>
+    <a href="multiple-trees.html" data-page="multiple-trees">Multiple Trees</a>
+    <div class="nav-section">Use</div>
+    <a href="cuts-and-views.html" data-page="cuts-and-views">Cuts &amp; Views</a>
+    <a href="labels.html" data-page="labels">Labels</a>
+    <a href="persistence.html" data-page="persistence">Persistence</a>
+    <a href="visualization.html" data-page="visualization">Visualization</a>
+    <div class="nav-section">Extend</div>
+    <a href="adapters.html" data-page="adapters">Adapters</a>
+    <a href="extending.html" data-page="extending">Extending Orchard</a>
+  </nav>
+</aside>
+    <main class="content">
+      <h1>Getting Started</h1>
+      <p class="muted">Local-first hierarchical trees over a fixed document corpus.</p>
+      <h2>Install</h2>
+      <pre><code>uv pip install -e ".[dev]"</code></pre>
+      <h2>Minimal example</h2>
+      <pre><code>from orchard import OrchardBuilder
+
+orchard = OrchardBuilder().build([
+    "Schedule a calendar reminder for tomorrow morning.",
+    "Send an email summary of the weekly status notes.",
+    "Create a task to review the draft proposal.",
+    "Find documents mentioning quarterly budget planning.",
+])
+print(orchard.tree_ids)  # ('domain', 'function')
+domain = orchard.tree("domain")
+orchard.save("artifacts/demo_orchard")</code></pre>
+      <h2>Semantic-only tree</h2>
+      <pre><code>from orchard import OrchardBuilder
+
+orchard = OrchardBuilder(taxonomies=[]).build(documents)
+semantic = orchard.tree("semantic")</code></pre>
+      <h2>Next</h2>
+      <p>Read <a href="architecture.html">Architecture</a> for the object model, or <a href="building-trees.html">Building Trees</a> for builder options.</p>
+    </main>
+  </div>
+  <script src="assets/site.js"></script>
+</body>
+</html>

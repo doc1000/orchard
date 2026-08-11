@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cuts & Views — Orchard</title>
+  <link rel="stylesheet" href="assets/site.css" />
+</head>
+<body data-page="cuts-and-views">
+  <div class="layout">
+<aside class="sidebar">
+  <div class="brand">Orchard<span>local hierarchical trees</span></div>
+  <nav class="nav">
+    <div class="nav-section">Start</div>
+    <a href="index.html" data-page="getting-started">Getting Started</a>
+    <a href="architecture.html" data-page="architecture">Architecture</a>
+    <div class="nav-section">Core</div>
+    <a href="documents.html" data-page="documents">Documents</a>
+    <a href="taxonomies.html" data-page="taxonomies">Taxonomies</a>
+    <a href="building-trees.html" data-page="building-trees">Building Trees</a>
+    <a href="multiple-trees.html" data-page="multiple-trees">Multiple Trees</a>
+    <div class="nav-section">Use</div>
+    <a href="cuts-and-views.html" data-page="cuts-and-views">Cuts &amp; Views</a>
+    <a href="labels.html" data-page="labels">Labels</a>
+    <a href="persistence.html" data-page="persistence">Persistence</a>
+    <a href="visualization.html" data-page="visualization">Visualization</a>
+    <div class="nav-section">Extend</div>
+    <a href="adapters.html" data-page="adapters">Adapters</a>
+    <a href="extending.html" data-page="extending">Extending Orchard</a>
+  </nav>
+</aside>
+    <main class="content">
+      <h1>Cuts &amp; Views</h1>
+      <pre><code>from orchard import build_dynamic_cut, validate_dynamic_cut, pack_canonical_tree
+
+cut = build_dynamic_cut(tree, top_criterion="cluster_count", cluster_count=4,
+                        min_width=1, max_width=8, target_width=4)
+validate_dynamic_cut(cut, tree)
+packed = pack_canonical_tree(tree, target_exposed_clusters=4, max_depth=3)
+sub = tree.subtree(node_id)</code></pre>
+      <p>Every cut partitions the active leaf set exactly. Subtrees keep canonical IDs.</p>
+    </main>
+  </div>
+  <script src="assets/site.js"></script>
+</body>
+</html>

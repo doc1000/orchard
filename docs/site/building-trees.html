@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Building Trees — Orchard</title>
+  <link rel="stylesheet" href="assets/site.css" />
+</head>
+<body data-page="building-trees">
+  <div class="layout">
+<aside class="sidebar">
+  <div class="brand">Orchard<span>local hierarchical trees</span></div>
+  <nav class="nav">
+    <div class="nav-section">Start</div>
+    <a href="index.html" data-page="getting-started">Getting Started</a>
+    <a href="architecture.html" data-page="architecture">Architecture</a>
+    <div class="nav-section">Core</div>
+    <a href="documents.html" data-page="documents">Documents</a>
+    <a href="taxonomies.html" data-page="taxonomies">Taxonomies</a>
+    <a href="building-trees.html" data-page="building-trees">Building Trees</a>
+    <a href="multiple-trees.html" data-page="multiple-trees">Multiple Trees</a>
+    <div class="nav-section">Use</div>
+    <a href="cuts-and-views.html" data-page="cuts-and-views">Cuts &amp; Views</a>
+    <a href="labels.html" data-page="labels">Labels</a>
+    <a href="persistence.html" data-page="persistence">Persistence</a>
+    <a href="visualization.html" data-page="visualization">Visualization</a>
+    <div class="nav-section">Extend</div>
+    <a href="adapters.html" data-page="adapters">Adapters</a>
+    <a href="extending.html" data-page="extending">Extending Orchard</a>
+  </nav>
+</aside>
+    <main class="content">
+      <h1>Building Trees</h1>
+      <pre><code>from orchard import OrchardBuilder, DomainTaxonomy, FunctionTaxonomy
+
+# defaults: domain + function
+orchard = OrchardBuilder().build(documents)
+
+# semantic only
+orchard = OrchardBuilder(taxonomies=[]).build(documents)
+
+# explicit taxonomies
+orchard = OrchardBuilder(
+    taxonomies=[DomainTaxonomy.load_default(), FunctionTaxonomy.load_default()]
+).build(documents)</code></pre>
+      <p>Inspect config with <code>builder.get_params()</code>. Default semantic backend is offline TF-IDF.</p>
+    </main>
+  </div>
+  <script src="assets/site.js"></script>
+</body>
+</html>
