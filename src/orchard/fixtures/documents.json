@@ -1,0 +1,30 @@
+[
+  {
+    "item_id": "alpha",
+    "text": "Schedule a calendar reminder for tomorrow morning.",
+    "title": "Calendar reminder",
+    "metadata": {"topic": "scheduling"},
+    "source": "fixture"
+  },
+  {
+    "item_id": "bravo",
+    "text": "Send an email summary of the weekly status notes.",
+    "title": "Email summary",
+    "metadata": {"topic": "messaging"},
+    "source": "fixture"
+  },
+  {
+    "item_id": "charlie",
+    "text": "Create a task to review the draft proposal.",
+    "title": "Task create",
+    "metadata": {"topic": "tasks"},
+    "source": "fixture"
+  },
+  {
+    "item_id": "delta",
+    "text": "Find documents mentioning quarterly budget planning.",
+    "title": "Document search",
+    "metadata": {"topic": "search"},
+    "source": "fixture"
+  }
+]
