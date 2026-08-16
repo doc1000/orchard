@@ -20,23 +20,33 @@ Indented map of the repository. Tags: `[proposed]` = planned, not yet implemente
 - `document.py` — `Document`
 - `identity.py` — membership hashes, SciPy index ↔ canonical IDs
 - `schemas.py` — artifact / tree / cut / viz schema versions
-- `exceptions.py` — `OrchardError` hierarchy; corpus mutation unsupported
+- `exceptions.py` — `OrchardError` hierarchy; `InvalidFusionError`; corpus mutation unsupported
 - `tree.py` — `Tree.from_linkage`, subtree, named label storage
 - `orchard.py` — multi-tree `Orchard.from_trees` / `save` / `load`
-- `builder.py` — `OrchardBuilder.build` (defaults → domain+function; `[]` → semantic)
+- `builder.py` — `OrchardBuilder.build` (defaults → domain+function; `[]` → semantic); inspectable single-layer fusion profiles
 - `taxonomy.py` — cue/fit taxonomy models + packaged defaults
 - `labels.py` — `label_intrinsic`, `import_labels` (no contrastive API)
 - `cuts.py` — dynamic cut, Steiner local-Z, packing, walk helpers
 - `viz.py` — Plotly-oriented nested payloads
-- `backends/` — TF-IDF + similarity/linkage numeric cores
+- `backends/` — TF-IDF + similarity/linkage + fusion engine + layer registry
+  - `fusion.py` — `SimilarityProfile`, raw-convex and variance-calibrated fusion (D-027/D-030/D-031)
+  - `layers.py` — layer protocol + registry (`tfidf_cosine`, `{taxonomy}_raw_js`)
+  - `similarity.py` — cosine/JS + `linkage_from_similarity` / `linkage_from_dissimilarity`
+  - `tfidf.py` — offline TF-IDF backend
+  - `minilm.py` `[proposed]`
+  - `modernbert.py` `[proposed]`
+  - `taxonomy_heads.py` `[proposed]`
 - `adapters/` — directory / JSON / JSONL / CSV / records → `Document`
   - `documents_from_*`, `load_documents`
 - `assets/taxonomies/` — replaceable Domain/Function JSON + PROVENANCE
+  - `heads/` `[proposed]`
 - `fixtures/` — generic reference corpus + sample linkage
 
 ### Future (not shipped)
 
 - neural embedding backends `[proposed]`
+- MiniLM semantic backend `[proposed]`
+- ModernBERT taxonomy heads `[proposed]`
 - contrastive labeling `[proposed]`
 - OpenAI intrinsic backend `[proposed]`
 
@@ -50,6 +60,7 @@ Indented map of the repository. Tags: `[proposed]` = planned, not yet implemente
 - `test_external_linkage_and_viz.py` — external Z path + multi-tree viz
 - `test_builder_semantic.py` — no-taxonomy → `semantic`
 - `test_builder_taxonomies.py` — one tree per taxonomy
+- `test_fusion.py` — fusion engine + layer registry (no GPU)
 - `test_default_taxonomies.py` — Domain + Function defaults
 - `test_labels_immutable_linkage.py` — label overlays immutable w.r.t. linkage
 - `test_adapters.py` — adapters → `build`

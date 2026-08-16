@@ -2,20 +2,33 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any, Literal, Mapping, Sequence
 
 import numpy as np
 
+from orchard.backends.fusion import (
+    FUSION_MODES,
+    SimilarityProfile,
+    fuse_to_dissimilarity,
+)
+from orchard.backends.layers import (
+    LayerRegistry,
+    TaxonomyCosineLayer,
+    TaxonomyJsLayer,
+    TfidfCosineLayer,
+)
 from orchard.backends.similarity import (
     cosine_matrix,
     jensen_shannon_matrix,
+    linkage_from_dissimilarity,
     linkage_from_similarity,
     validate_similarity_matrix,
 )
 from orchard.backends.tfidf import TfidfEmbeddingBackend
 from orchard.document import Document
-from orchard.exceptions import InvalidIdentityError
+from orchard.exceptions import InvalidFusionError, InvalidIdentityError
 from orchard.identity import ensure_unique_item_ids, validate_tree_id
 from orchard.orchard import Orchard
 from orchard.taxonomy import Taxonomy, default_taxonomies
@@ -65,12 +78,20 @@ class OrchardBuilder:
     semantic_signed_cosine: bool = False
     taxonomy_similarity: str = "jensen_shannon"
     include_semantic_with_taxonomies: bool = False
+    fusion_mode: Literal["variance_calibrated", "raw_convex"] = "variance_calibrated"
+    profiles: Mapping[str, SimilarityProfile | Mapping[str, float]] | None = None
+    semantic_weights: Mapping[str, float] | None = None
+    taxonomy_weights: Mapping[str, Mapping[str, float]] | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.taxonomy_similarity not in {"jensen_shannon", "cosine"}:
             raise InvalidIdentityError(
                 "taxonomy_similarity must be 'jensen_shannon' or 'cosine'"
+            )
+        if self.fusion_mode not in FUSION_MODES:
+            raise InvalidFusionError(
+                "fusion_mode must be 'variance_calibrated' or 'raw_convex'"
             )
         if self.taxonomies is _UNSET or self.taxonomies is None:
             self.taxonomies = default_taxonomies()
@@ -81,6 +102,7 @@ class OrchardBuilder:
             raise InvalidIdentityError("taxonomy names must be unique tree ids")
         if self.embedding_backend is None:
             self.embedding_backend = TfidfEmbeddingBackend()
+        self.profiles = self._resolve_profiles()
 
     def get_params(self) -> dict[str, Any]:
         """Inspectable builder configuration (sklearn-style)."""
@@ -91,6 +113,21 @@ class OrchardBuilder:
             "semantic_signed_cosine": self.semantic_signed_cosine,
             "taxonomy_similarity": self.taxonomy_similarity,
             "include_semantic_with_taxonomies": self.include_semantic_with_taxonomies,
+            "fusion_mode": self.fusion_mode,
+            "profiles": {
+                tree_id: profile.to_dict() for tree_id, profile in self.profiles.items()
+            },
+            "semantic_weights": (
+                None if self.semantic_weights is None else dict(self.semantic_weights)
+            ),
+            "taxonomy_weights": (
+                None
+                if self.taxonomy_weights is None
+                else {
+                    name: dict(weights)
+                    for name, weights in self.taxonomy_weights.items()
+                }
+            ),
             "metadata": dict(self.metadata),
         }
 
@@ -119,34 +156,45 @@ class OrchardBuilder:
         )
 
     def _build_semantic_tree(self, documents: Sequence[Document]) -> Tree:
-        texts = [doc.text for doc in documents]
-        features = np.asarray(self.embedding_backend.encode(texts), dtype=np.float64)
-        if features.shape[0] != len(documents):
-            raise InvalidIdentityError("embedding backend row count must match documents")
-        similarity = cosine_matrix(features, signed=self.semantic_signed_cosine)
-        return self._tree_from_similarity(
-            similarity,
-            documents,
-            tree_id="semantic",
-        )
+        profile = self.profiles["semantic"]
+        if self._is_native_single_layer(profile, "tfidf_cosine"):
+            texts = [doc.text for doc in documents]
+            features = np.asarray(self.embedding_backend.encode(texts), dtype=np.float64)
+            if features.shape[0] != len(documents):
+                raise InvalidIdentityError(
+                    "embedding backend row count must match documents"
+                )
+            similarity = cosine_matrix(features, signed=self.semantic_signed_cosine)
+            return self._tree_from_similarity(
+                similarity,
+                documents,
+                tree_id="semantic",
+            )
+        return self._tree_from_profile(profile, documents)
 
     def _build_taxonomy_tree(
         self,
         documents: Sequence[Document],
         taxonomy: Taxonomy,
     ) -> Tree:
-        distributions = np.asarray(taxonomy.transform(documents), dtype=np.float64)
-        if distributions.shape[0] != len(documents):
-            raise InvalidIdentityError("taxonomy transform row count must match documents")
-        if self.taxonomy_similarity == "jensen_shannon":
-            similarity = jensen_shannon_matrix(distributions)
-        else:
-            similarity = cosine_matrix(distributions, signed=False)
-        return self._tree_from_similarity(
-            similarity,
-            documents,
-            tree_id=taxonomy.name,
-        )
+        profile = self.profiles[taxonomy.name]
+        native_layer = self._native_taxonomy_layer(taxonomy.name)
+        if self._is_native_single_layer(profile, native_layer):
+            distributions = np.asarray(taxonomy.transform(documents), dtype=np.float64)
+            if distributions.shape[0] != len(documents):
+                raise InvalidIdentityError(
+                    "taxonomy transform row count must match documents"
+                )
+            if self.taxonomy_similarity == "jensen_shannon":
+                similarity = jensen_shannon_matrix(distributions)
+            else:
+                similarity = cosine_matrix(distributions, signed=False)
+            return self._tree_from_similarity(
+                similarity,
+                documents,
+                tree_id=taxonomy.name,
+            )
+        return self._tree_from_profile(profile, documents)
 
     def _tree_from_similarity(
         self,
@@ -167,4 +215,110 @@ class OrchardBuilder:
             tree_id=tree_id,
             method=self.linkage_method,
             documents=documents,
+        )
+
+    def _tree_from_profile(
+        self,
+        profile: SimilarityProfile,
+        documents: Sequence[Document],
+    ) -> Tree:
+        item_ids = [doc.item_id for doc in documents]
+        registry = self._layer_registry()
+        matrices = registry.compute_many(
+            tuple(profile.weights),
+            documents,
+            item_ids=item_ids,
+        )
+        dissimilarity = fuse_to_dissimilarity(
+            matrices,
+            profile.weights,
+            fusion_mode=profile.fusion_mode,
+        )
+        z_matrix = linkage_from_dissimilarity(
+            dissimilarity,
+            method=self.linkage_method,
+        )
+        return Tree.from_linkage(
+            z_matrix,
+            item_ids=item_ids,
+            tree_id=profile.name,
+            method=self.linkage_method,
+            documents=documents,
+        )
+
+    def _layer_registry(self) -> LayerRegistry:
+        layers: list[Any] = [
+            TfidfCosineLayer(
+                backend=self.embedding_backend,
+                signed=self.semantic_signed_cosine,
+            )
+        ]
+        for taxonomy in self.taxonomies:
+            layers.append(TaxonomyJsLayer(taxonomy=taxonomy))
+            layers.append(TaxonomyCosineLayer(taxonomy=taxonomy))
+        return LayerRegistry(layers)
+
+    def _planned_tree_ids(self) -> list[str]:
+        if not self.taxonomies:
+            return ["semantic"]
+        names = [taxonomy.name for taxonomy in self.taxonomies]
+        if self.include_semantic_with_taxonomies:
+            names.append("semantic")
+        return names
+
+    def _native_taxonomy_layer(self, taxonomy_name: str) -> str:
+        if self.taxonomy_similarity == "jensen_shannon":
+            return f"{taxonomy_name}_raw_js"
+        return f"{taxonomy_name}_cosine"
+
+    def _default_weights(self, tree_id: str) -> dict[str, float]:
+        if tree_id == "semantic":
+            if self.semantic_weights is not None:
+                return dict(self.semantic_weights)
+            return {"tfidf_cosine": 1.0}
+        if self.taxonomy_weights is not None and tree_id in self.taxonomy_weights:
+            return dict(self.taxonomy_weights[tree_id])
+        return {self._native_taxonomy_layer(tree_id): 1.0}
+
+    def _coerce_profile(
+        self,
+        tree_id: str,
+        value: SimilarityProfile | Mapping[str, float],
+    ) -> SimilarityProfile:
+        if isinstance(value, SimilarityProfile):
+            return value
+        if isinstance(value, Mapping):
+            return SimilarityProfile(
+                name=tree_id,
+                weights=value,
+                fusion_mode=self.fusion_mode,
+            )
+        raise InvalidFusionError(
+            f"profile {tree_id!r} must be a SimilarityProfile or weight mapping"
+        )
+
+    def _resolve_profiles(self) -> dict[str, SimilarityProfile]:
+        provided = dict(self.profiles) if self.profiles is not None else {}
+        resolved: dict[str, SimilarityProfile] = {}
+        for tree_id, value in provided.items():
+            resolved[str(tree_id)] = self._coerce_profile(str(tree_id), value)
+        for tree_id in self._planned_tree_ids():
+            if tree_id not in resolved:
+                resolved[tree_id] = SimilarityProfile(
+                    name=tree_id,
+                    weights=self._default_weights(tree_id),
+                    fusion_mode=self.fusion_mode,
+                )
+        return resolved
+
+    @staticmethod
+    def _is_native_single_layer(
+        profile: SimilarityProfile,
+        native_layer: str,
+    ) -> bool:
+        if len(profile.weights) != 1:
+            return False
+        layer, weight = next(iter(profile.weights.items()))
+        return layer == native_layer and math.isclose(
+            weight, 1.0, abs_tol=1e-12, rel_tol=0
         )

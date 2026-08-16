@@ -13,6 +13,7 @@ from orchard.document import Document
 from orchard.exceptions import (
     CorpusMutationUnsupportedError,
     DuplicateItemIdError,
+    InvalidFusionError,
     InvalidIdentityError,
     InvalidLinkageError,
     OrchardError,
@@ -55,6 +56,7 @@ __all__ = [
     "DomainTaxonomy",
     "DuplicateItemIdError",
     "FunctionTaxonomy",
+    "InvalidFusionError",
     "InvalidIdentityError",
     "InvalidLinkageError",
     "Orchard",

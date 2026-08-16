@@ -19,6 +19,10 @@ class InvalidLinkageError(OrchardError, ValueError):
     """Raised when a linkage matrix cannot be mapped to canonical IDs."""
 
 
+class InvalidFusionError(OrchardError, ValueError):
+    """Raised when fusion weights, layers, or calibrated variance are invalid."""
+
+
 class CorpusMutationUnsupportedError(OrchardError, NotImplementedError):
     """Raised when incremental insert/delete/mutation of a corpus is requested."""
 

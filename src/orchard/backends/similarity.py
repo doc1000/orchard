@@ -9,6 +9,8 @@ import numpy as np
 from scipy.cluster.hierarchy import linkage
 from scipy.spatial.distance import squareform
 
+from orchard.exceptions import InvalidFusionError
+
 
 def normalize_rows(values: np.ndarray) -> np.ndarray:
     norms = np.linalg.norm(values, axis=1, keepdims=True)
@@ -96,4 +98,37 @@ def linkage_from_similarity(
     if n < 2:
         return np.zeros((0, 4), dtype=np.float64)
     condensed = squareform(dissimilarity, checks=False)
+    return linkage(condensed, method=method)
+
+
+def linkage_from_dissimilarity(
+    dissimilarity: np.ndarray,
+    *,
+    method: str = "average",
+) -> np.ndarray:
+    """Build SciPy linkage Z from a precomputed dissimilarity (phase4a).
+
+    Raw-convex trees pass D = 1 − S. Variance-calibrated trees consume D as-is
+    (D-031). Ward is rejected because these matrices are not guaranteed Euclidean.
+    """
+    if method == "ward":
+        raise InvalidFusionError(
+            "ward is rejected on the precomputed-dissimilarity path"
+        )
+    result = np.asarray(dissimilarity, dtype=np.float64)
+    if (
+        result.ndim != 2
+        or result.shape[0] != result.shape[1]
+        or not np.isfinite(result).all()
+        or not np.allclose(result, result.T, atol=1e-12)
+        or np.any(result < -1e-12)
+        or not np.allclose(np.diag(result), 0.0, atol=1e-12)
+    ):
+        raise InvalidFusionError("matrix cannot be consumed as a dissimilarity")
+    result = result.copy()
+    result[result < 0] = 0
+    n = result.shape[0]
+    if n < 2:
+        return np.zeros((0, 4), dtype=np.float64)
+    condensed = squareform(result, checks=False)
     return linkage(condensed, method=method)
