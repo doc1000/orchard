@@ -72,6 +72,13 @@ raw records
 
 Construction is relatively expensive and produces durable artifacts.
 
+Default named trees use **per-tree** fused profiles (independent MiniLM,
+document TF-IDF, and taxonomy Jensen–Shannon layers). There is no orchard
+tree named `fused` or `mixed`. Weights and `fusion_mode` (`variance_calibrated`
+by default) are inspectable via `OrchardBuilder.get_params()` and overridable
+through `profiles` / weight maps. Do not concatenate heterogeneous feature
+vectors. See `docs/DECISIONS.md`.
+
 ### Manipulation
 
 ```text

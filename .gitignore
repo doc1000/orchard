@@ -11,5 +11,6 @@ build/
 venv/
 uv.lock
 *.npz
+!src/orchard/assets/taxonomies/heads/*.npz
 .coverage
 htmlcov/

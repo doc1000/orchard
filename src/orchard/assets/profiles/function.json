@@ -1,0 +1,25 @@
+{
+  "name": "function",
+  "schema_version": "orchard_taxonomy_profile_v1",
+  "fusion_mode": "variance_calibrated",
+  "weights": {
+    "function_raw_js": 0.48,
+    "description_minilm_centered_cosine": 0.25,
+    "tfidf_cosine": 0.15,
+    "domain_raw_js": 0.12
+  },
+  "single_taxonomy_weights": {
+    "function_raw_js": 0.60,
+    "description_minilm_centered_cosine": 0.25,
+    "tfidf_cosine": 0.15
+  },
+  "provenance": {
+    "decisions": ["D-002", "D-027", "D-030"],
+    "source": "AppWorld Phase 3B no-app function profile; 0.03 app_exact_match folded into function_raw_js",
+    "notes": [
+      "Layer name is function_raw_js (tree id function). That is AppWorld functional_raw_js.",
+      "Single-taxonomy dict omits the missing JS layer; do not renormalize at runtime.",
+      "No app_exact_match in this phase."
+    ]
+  }
+}

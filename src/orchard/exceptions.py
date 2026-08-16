@@ -34,7 +34,8 @@ class MissingOptionalDependencyError(OrchardError, ImportError):
         self.extra = extra
         text = message or (
             f"orchard[{extra}] is required. Install that extra, or opt in with "
-            "allow_offline_fallback=True or embedding_backend=TfidfEmbeddingBackend()."
+            "allow_offline_fallback=True, embedding_backend=TfidfEmbeddingBackend(), "
+            "or an explicit cue-only / custom taxonomy."
         )
         super().__init__(text)
 

@@ -37,7 +37,7 @@
 domain = DomainTaxonomy.load_default()
 function = FunctionTaxonomy.load_default()
 custom = TaxonomyModel.load("path/to/domain.json")</code></pre>
-      <p>Cue-based <code>transform</code> is offline. Optional <code>fit(documents, labels_by_item_id)</code> trains a TF-IDF logistic head.</p>
+      <p>With <code>orchard[taxonomy-ml]</code> (or an injected encoder), default Domain/Function load packaged ModernBERT+logistic heads (<code>taxonomy_transform: "modernbert_logistic"</code>). Cue is the explicit offline fallback (<code>allow_offline_fallback=True</code> or a custom cue taxonomy). When MiniLM is also active, each named taxonomy tree fuses both JS layers with MiniLM and document TF-IDF. Optional <code>fit(documents, labels_by_item_id)</code> trains a replacement head.</p>
     </main>
   </div>
   <script src="assets/site.js"></script>

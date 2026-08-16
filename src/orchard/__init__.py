@@ -1,5 +1,6 @@
 """Orchard: persistent hierarchical trees over a fixed document corpus."""
 
+from orchard.backends.fusion import SimilarityProfile
 from orchard.builder import OrchardBuilder
 from orchard.cuts import (
     build_dynamic_cut,
@@ -64,6 +65,7 @@ __all__ = [
     "Orchard",
     "OrchardBuilder",
     "OrchardError",
+    "SimilarityProfile",
     "StubTaxonomy",
     "TaxonomyModel",
     "Tree",

@@ -1,0 +1,25 @@
+{
+  "name": "domain",
+  "schema_version": "orchard_taxonomy_profile_v1",
+  "fusion_mode": "variance_calibrated",
+  "weights": {
+    "domain_raw_js": 0.48,
+    "description_minilm_centered_cosine": 0.23,
+    "tfidf_cosine": 0.14,
+    "function_raw_js": 0.15
+  },
+  "single_taxonomy_weights": {
+    "domain_raw_js": 0.63,
+    "description_minilm_centered_cosine": 0.23,
+    "tfidf_cosine": 0.14
+  },
+  "provenance": {
+    "decisions": ["D-002", "D-027", "D-030"],
+    "source": "AppWorld Phase 3B no-app domain profile; 0.03 app_exact_match folded into domain_raw_js",
+    "notes": [
+      "Both-taxonomy dict includes function_raw_js (AppWorld functional_raw_js).",
+      "Single-taxonomy dict omits the missing JS layer; do not renormalize at runtime.",
+      "No app_exact_match in this phase."
+    ]
+  }
+}

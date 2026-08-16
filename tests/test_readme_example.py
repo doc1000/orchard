@@ -2,12 +2,26 @@
 
 from __future__ import annotations
 
+import pytest
+
 from orchard import OrchardBuilder
 from orchard.backends.tfidf import TfidfEmbeddingBackend
 
 
-def test_readme_minimal_example() -> None:
-    orchard = OrchardBuilder().build(
+def test_readme_minimal_example(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "orchard.builder.taxonomy_ml_extra_available",
+        lambda: False,
+    )
+    monkeypatch.setattr(
+        "orchard.taxonomy.taxonomy_ml_extra_available",
+        lambda: False,
+    )
+    monkeypatch.setattr(
+        "orchard.builder.embeddings_extra_available",
+        lambda: False,
+    )
+    orchard = OrchardBuilder(allow_offline_fallback=True).build(
         [
             "Schedule a calendar reminder for tomorrow morning.",
             "Send an email summary of the weekly status notes.",

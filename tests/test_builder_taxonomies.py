@@ -1,4 +1,4 @@
-"""Phase 2: one tree per taxonomy; no fused default tree."""
+"""One named tree per taxonomy; no orchard tree named fused/mixed."""
 
 from __future__ import annotations
 
@@ -70,8 +70,12 @@ def test_multi_taxonomy_build_produces_distinct_named_trees() -> None:
 
 
 def test_no_mixed_fused_default_tree_in_api() -> None:
-    orchard = OrchardBuilder(taxonomies=_fixture_taxonomies()).build(load_documents())
+    builder = OrchardBuilder(taxonomies=_fixture_taxonomies())
+    orchard = builder.build(load_documents())
     assert set(orchard.trees) == {"domain", "function"}
     for name in orchard.tree_ids:
         assert "mixed" not in name
         assert "fused" not in name
+    params = builder.get_params()
+    assert params["fusion_mode"] == "variance_calibrated"
+    assert "fusion_mode" in params

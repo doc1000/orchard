@@ -75,7 +75,8 @@ def embeddings_extra_available() -> bool:
 def missing_embeddings_error() -> MissingOptionalDependencyError:
     return MissingOptionalDependencyError(
         EMBEDDINGS_EXTRA,
-        "orchard[embeddings] is required for the MiniLM semantic backend. "
+        "orchard[embeddings] is required for the MiniLM description layer "
+        "(semantic tree and fused taxonomy profiles). "
         "Install that extra, or opt in with allow_offline_fallback=True or "
         "embedding_backend=TfidfEmbeddingBackend().",
     )

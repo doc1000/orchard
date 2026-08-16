@@ -31,19 +31,28 @@
 </aside>
     <main class="content">
       <h1>Building Trees</h1>
-      <pre><code>from orchard import OrchardBuilder, DomainTaxonomy, FunctionTaxonomy
+      <pre><code>from orchard import OrchardBuilder, DomainTaxonomy, FunctionTaxonomy, SimilarityProfile
+from orchard.backends.tfidf import TfidfEmbeddingBackend
 
-# defaults: domain + function
-orchard = OrchardBuilder().build(documents)
+# neural extras (or injected MiniLM + heads): fused domain + function
+builder = OrchardBuilder()
+orchard = builder.build(documents)
+params = builder.get_params()  # fusion_mode, per-tree weights, backends
 
-# semantic only
-orchard = OrchardBuilder(taxonomies=[]).build(documents)
+# clean-env / CI: single-layer cue JS + TF-IDF
+orchard = OrchardBuilder(allow_offline_fallback=True).build(documents)
 
-# explicit taxonomies
+# semantic only (explicit TF-IDF)
 orchard = OrchardBuilder(
-    taxonomies=[DomainTaxonomy.load_default(), FunctionTaxonomy.load_default()]
+    taxonomies=[],
+    embedding_backend=TfidfEmbeddingBackend(),
+).build(documents)
+
+# override a tree profile (weights must sum to 1)
+orchard = OrchardBuilder(
+    profiles={"domain": SimilarityProfile(name="domain", weights={"domain_raw_js": 1.0})}
 ).build(documents)</code></pre>
-      <p>Inspect config with <code>builder.get_params()</code>. Default semantic backend is offline TF-IDF.</p>
+      <p>Default neural profiles are MiniLM + document TF-IDF + taxonomy Jensen–Shannon, fused with <code>variance_calibrated</code> (n≥3). Tree names stay <code>domain</code> / <code>function</code> / <code>semantic</code> — there is no tree named <code>fused</code>.</p>
     </main>
   </div>
   <script src="assets/site.js"></script>

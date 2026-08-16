@@ -1,13 +1,20 @@
-"""Taxonomy protocols, cue-based models, and default Domain/Function assets."""
+"""Taxonomy protocols, cue-based models, and default Domain/Function assets.
+
+Default Domain/Function taxonomies load packaged ModernBERT+logistic heads
+when ``orchard[taxonomy-ml]`` (or an injected encoder) is present.
+``transform()`` is then ``modernbert_logistic``. Cue is the explicit offline
+fallback, not the neural default.
+"""
 
 from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
-from typing import Any, Mapping, Protocol, Sequence, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -94,17 +101,37 @@ def _document_tokens(document: Document) -> set[str]:
     return set(TOKEN_RE.findall(text))
 
 
+def _document_title_text(document: Document) -> str:
+    return f"{document.title} {document.text}".strip()
+
+
+def taxonomy_ml_extra_available() -> bool:
+    from orchard.backends.modernbert import (
+        taxonomy_ml_extra_available as extra_available,
+    )
+
+    return extra_available()
+
+
+def missing_taxonomy_ml_error():
+    from orchard.backends.modernbert import missing_taxonomy_ml_error as missing_error
+
+    return missing_error()
+
+
 @dataclass
 class TaxonomyModel:
-    """Inspectable taxonomy with cue transform and optional fitted classifier."""
+    """Inspectable taxonomy with cue transform and optional classifier head."""
 
     name: str
     label_order: tuple[str, ...]
     labels: dict[str, TaxonomyLabel]
     taxonomy_version: str = "orchard_taxonomy_v1"
     provenance: str = ""
+    taxonomy_transform: str = "cue"
     vectorizer: TfidfVectorizer | None = field(default=None, repr=False)
     classifier: LogisticRegression | None = field(default=None, repr=False)
+    feature_encoder: Any | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         self.name = validate_tree_id(self.name)
@@ -144,7 +171,7 @@ class TaxonomyModel:
 
     @classmethod
     def load_default(cls, name: str) -> TaxonomyModel:
-        """Load a packaged default taxonomy definition by name."""
+        """Load a packaged default taxonomy definition by name (cue-capable JSON)."""
         name = validate_tree_id(name)
         resource = resources.files("orchard.assets.taxonomies").joinpath(f"{name}.json")
         if not resource.is_file():
@@ -200,7 +227,7 @@ class TaxonomyModel:
                 continue
             if label not in self.labels:
                 raise InvalidIdentityError(f"unknown label {label!r} for {doc.item_id}")
-            texts.append(f"{doc.title} {doc.text}".strip())
+            texts.append(_document_title_text(doc))
             y.append(label)
         if len(set(y)) < 2:
             raise InvalidIdentityError("fit requires at least two distinct labels")
@@ -210,11 +237,62 @@ class TaxonomyModel:
         classifier.fit(features, y)
         self.vectorizer = vectorizer
         self.classifier = classifier
+        self.feature_encoder = None
+        self.taxonomy_transform = "cue"
         return self
 
+    def attach_packaged_head(self, encoder: Any | None = None) -> TaxonomyModel:
+        """Load the packaged ModernBERT logistic head for this taxonomy name."""
+        from orchard.backends.taxonomy_heads import load_packaged_classifier
+
+        self.classifier = load_packaged_classifier(self.name, self.label_order)
+        self.vectorizer = None
+        self.feature_encoder = encoder
+        self.taxonomy_transform = "modernbert_logistic"
+        return self
+
+    def load_head(self, path: str | Path, encoder: Any | None = None) -> TaxonomyModel:
+        """Replace the logistic head from a portable ``npz`` (does not re-train)."""
+        from orchard.backends.taxonomy_heads import load_head as load_head_arrays
+
+        self.classifier = load_head_arrays(path, self.label_order)
+        self.vectorizer = None
+        if encoder is not None:
+            self.feature_encoder = encoder
+        self.taxonomy_transform = "modernbert_logistic"
+        return self
+
+    def save_head(self, path: str | Path) -> Path:
+        """Write the current logistic head as portable arrays."""
+        if self.classifier is None:
+            raise InvalidIdentityError("no classifier head to save")
+        from orchard.backends.taxonomy_heads import save_head as save_head_arrays
+
+        return save_head_arrays(
+            path,
+            self.classifier.coef_,
+            self.classifier.intercept_,
+            self.classifier.classes_.tolist(),
+        )
+
     def transform(self, documents: Sequence[Document]) -> np.ndarray:
+        if self.taxonomy_transform == "modernbert_logistic":
+            if self.classifier is None or self.feature_encoder is None:
+                raise InvalidIdentityError(
+                    "modernbert_logistic transform requires a loaded head and "
+                    "feature encoder; do not silently use cue"
+                )
+            texts = [_document_title_text(doc) for doc in documents]
+            features = np.asarray(self.feature_encoder.encode(texts), dtype=np.float64)
+            if features.shape[0] != len(documents):
+                raise InvalidIdentityError(
+                    "taxonomy encoder row count must match documents"
+                )
+            from orchard.backends.taxonomy_heads import predict_proba_rows
+
+            return predict_proba_rows(self.classifier, features, self.label_order)
         if self.classifier is not None and self.vectorizer is not None:
-            texts = [f"{doc.title} {doc.text}".strip() for doc in documents]
+            texts = [_document_title_text(doc) for doc in documents]
             features = self.vectorizer.transform(texts)
             probabilities = self.classifier.predict_proba(features)
             class_index = {label: index for index, label in enumerate(self.classifier.classes_)}
@@ -250,22 +328,70 @@ class TaxonomyModel:
         return np.asarray(rows, dtype=np.float64)
 
 
+def _load_product_default(
+    name: str,
+    *,
+    allow_offline_fallback: bool = False,
+    classifier_backend: Any | None = None,
+) -> TaxonomyModel:
+    from orchard.backends.modernbert import ModernBERTFeatureBackend
+
+    model = TaxonomyModel.load_default(name)
+    if classifier_backend is not None:
+        return model.attach_packaged_head(classifier_backend)
+    if taxonomy_ml_extra_available():
+        return model.attach_packaged_head(ModernBERTFeatureBackend())
+    if allow_offline_fallback:
+        model.taxonomy_transform = "cue"
+        return model
+    raise missing_taxonomy_ml_error()
+
+
 class DomainTaxonomy:
     """Convenience loader for the packaged Domain taxonomy."""
 
     @staticmethod
-    def load_default() -> TaxonomyModel:
-        return TaxonomyModel.load_default("domain")
+    def load_default(
+        *,
+        allow_offline_fallback: bool = False,
+        classifier_backend: Any | None = None,
+    ) -> TaxonomyModel:
+        return _load_product_default(
+            "domain",
+            allow_offline_fallback=allow_offline_fallback,
+            classifier_backend=classifier_backend,
+        )
 
 
 class FunctionTaxonomy:
     """Convenience loader for the packaged Function taxonomy."""
 
     @staticmethod
-    def load_default() -> TaxonomyModel:
-        return TaxonomyModel.load_default("function")
+    def load_default(
+        *,
+        allow_offline_fallback: bool = False,
+        classifier_backend: Any | None = None,
+    ) -> TaxonomyModel:
+        return _load_product_default(
+            "function",
+            allow_offline_fallback=allow_offline_fallback,
+            classifier_backend=classifier_backend,
+        )
 
 
-def default_taxonomies() -> list[TaxonomyModel]:
-    """Return replaceable Domain + Function defaults (no AppWorld dependency)."""
-    return [DomainTaxonomy.load_default(), FunctionTaxonomy.load_default()]
+def default_taxonomies(
+    *,
+    allow_offline_fallback: bool = False,
+    classifier_backend: Any | None = None,
+) -> list[TaxonomyModel]:
+    """Return replaceable Domain + Function defaults (no AppWorld runtime)."""
+    return [
+        DomainTaxonomy.load_default(
+            allow_offline_fallback=allow_offline_fallback,
+            classifier_backend=classifier_backend,
+        ),
+        FunctionTaxonomy.load_default(
+            allow_offline_fallback=allow_offline_fallback,
+            classifier_backend=classifier_backend,
+        ),
+    ]

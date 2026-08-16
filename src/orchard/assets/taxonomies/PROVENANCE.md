@@ -10,5 +10,11 @@ Adaptations for Orchard:
 - Cue sets retained as offline transform signals (no ModernBERT / joblib heads)
 - Tree names are `domain` and `function` (demo used `functional` for the latter)
 
-Replace these JSON files or call `TaxonomyModel.load(...)` / `.fit(...)` to
-swap definitions without changing Orchard linkage code.
+Packaged ModernBERT+logistic student heads live in `heads/` (see
+`heads/PROVENANCE.md`). Cue sets remain the offline fallback transform.
+When `orchard[taxonomy-ml]` is installed, default Domain/Function
+`transform()` uses those heads (`modernbert_logistic`), not cues.
+
+Replace these JSON files or call `TaxonomyModel.load(...)` / `.fit(...)` /
+`.load_head(...)` to swap definitions or heads without changing Orchard
+linkage code.

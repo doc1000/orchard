@@ -23,6 +23,7 @@ from orchard.backends.minilm import (
     minilm_similarity_matrix,
     raw_cosine,
 )
+from orchard.backends.modernbert import ModernBERTFeatureBackend
 from orchard.backends.similarity import (
     cosine_matrix,
     jensen_shannon_matrix,
@@ -31,6 +32,11 @@ from orchard.backends.similarity import (
     similarity_to_dissimilarity,
     validate_similarity_matrix,
 )
+from orchard.backends.taxonomy_heads import (
+    load_packaged_arrays,
+    load_packaged_classifier,
+    remap_head_to_label_order,
+)
 from orchard.backends.tfidf import TfidfEmbeddingBackend, tfidf_matrix
 
 __all__ = [
@@ -38,6 +44,7 @@ __all__ = [
     "MatrixLayer",
     "MiniLMCosineLayer",
     "MiniLMEmbeddingBackend",
+    "ModernBERTFeatureBackend",
     "SimilarityLayer",
     "SimilarityProfile",
     "TaxonomyCosineLayer",
@@ -50,7 +57,10 @@ __all__ = [
     "jensen_shannon_matrix",
     "linkage_from_dissimilarity",
     "linkage_from_similarity",
+    "load_packaged_arrays",
+    "load_packaged_classifier",
     "mapped_cosine",
+    "remap_head_to_label_order",
     "minilm_similarity_matrix",
     "raw_convex_fusion",
     "raw_cosine",

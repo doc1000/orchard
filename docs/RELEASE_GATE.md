@@ -10,8 +10,8 @@ Gates apply to the standalone Orchard repository. Use generic fixtures only.
 
 - [x] Clean install succeeds in an empty environment (no external eval suite required).
 - [x] Generic fixtures load and satisfy identity contracts.
-- [x] Tiny corpus builds with no API keys and no taxonomies → Orchard with a `semantic` tree.
-- [x] Default Domain + Function taxonomy build succeeds → Orchard with both named trees.
+- [x] Tiny corpus builds with no API keys and no taxonomies → Orchard with a `semantic` tree. Clean-env / CI uses `allow_offline_fallback=True` or `TfidfEmbeddingBackend()`; neural MiniLM is `orchard[embeddings]` (or an injected backend).
+- [x] Default Domain + Function taxonomy build succeeds → Orchard with both named trees. Clean-env uses `allow_offline_fallback=True` (cue + own-taxonomy JS). Neural extras (`orchard[ml]` / fakes) produce fused no-app profiles + `modernbert_logistic`; they are optional for the clean-env gate.
 - [x] `Orchard` is multi-tree: `orchard.trees` / `orchard.tree(name)` work after save/load.
 - [x] Save/load preserves shared document IDs and per-tree canonical node identity.
 - [x] Every cut partitions the active leaf set exactly.

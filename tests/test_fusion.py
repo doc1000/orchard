@@ -23,7 +23,7 @@ from orchard.backends.similarity import (
 )
 from orchard.backends.tfidf import TfidfEmbeddingBackend
 from orchard.fixtures import load_documents
-from orchard.taxonomy import default_taxonomies
+from orchard.taxonomy import TaxonomyModel
 
 
 def _symmetric(off_diag: float) -> np.ndarray:
@@ -158,8 +158,15 @@ def test_explicit_tfidf_semantic_profile_is_inspectable_and_single_layer() -> No
 
 def test_default_taxonomy_trees_match_js_only_path() -> None:
     documents = load_documents()
-    orchard = OrchardBuilder().build(documents)
-    for taxonomy in default_taxonomies():
+    taxonomies = [
+        TaxonomyModel.load_default("domain"),
+        TaxonomyModel.load_default("function"),
+    ]
+    orchard = OrchardBuilder(
+        taxonomies=taxonomies,
+        embedding_backend=TfidfEmbeddingBackend(),
+    ).build(documents)
+    for taxonomy in taxonomies:
         distributions = taxonomy.transform(orchard.documents)
         similarity = jensen_shannon_matrix(distributions)
         expected = linkage_from_similarity(similarity, method="average")

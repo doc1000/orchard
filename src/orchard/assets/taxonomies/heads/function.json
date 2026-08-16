@@ -1,0 +1,49 @@
+{
+  "classes_": [
+    "func.authorize",
+    "func.communicate",
+    "func.create",
+    "func.delete",
+    "func.execute",
+    "func.respond",
+    "func.retrieve",
+    "func.search",
+    "func.update"
+  ],
+  "classes_order": "sklearn_alphabetical_student",
+  "estimator": "sklearn.linear_model._logistic.LogisticRegression",
+  "export_date": "2026-08-15",
+  "feature_model": {
+    "batch_size": 16,
+    "dimensions": 768,
+    "id": "answerdotai/ModernBERT-base",
+    "max_length": 512,
+    "pooling": "attention-mask-aware mean pooling",
+    "revision": "8949b909ec900327062f0ebf497f51aef5e6f0c8"
+  },
+  "label_order": [
+    "func.retrieve",
+    "func.search",
+    "func.create",
+    "func.update",
+    "func.delete",
+    "func.communicate",
+    "func.authorize",
+    "func.respond",
+    "func.execute"
+  ],
+  "logistic": {
+    "C": 0.1,
+    "class_weight": "balanced",
+    "max_iter": 1000,
+    "random_state": 20260725
+  },
+  "remap": "stored classes_ are student/sklearn-alphabetical; runtime remaps predict_proba columns onto packaged label_order",
+  "schema_version": "orchard_taxonomy_head_v1",
+  "sklearn_version": "1.8.0",
+  "source_student": "functional_taxonomy_v0_student.joblib",
+  "source_student_sha256": "13fa57af1f0e18d568c36091a465499baa6f6e661dce877fad714c4b741d0114",
+  "taxonomy_definition_sha256": "671bb5c9e6062b969398658931f2eead8c5a72a6921d873737ac63e7b5df87b5",
+  "taxonomy_name": "function",
+  "taxonomy_version": "orchard_taxonomy_v1"
+}

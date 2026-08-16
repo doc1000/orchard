@@ -33,7 +33,8 @@
       <h1>Extending Orchard</h1>
       <ul>
         <li>Swap taxonomy JSON or implement <code>transform(documents) -> ndarray</code></li>
-        <li>Pass a custom <code>embedding_backend</code> with <code>encode(texts) -> ndarray</code></li>
+        <li>Pass a custom <code>embedding_backend</code> with <code>encode(texts) -> ndarray</code> (MiniLM default; <code>TfidfEmbeddingBackend()</code> is the lexical opt-in)</li>
+        <li>Override per-tree <code>SimilarityProfile</code> / weight maps; weights must sum to 1 (never silently repaired)</li>
         <li>Start from external linkage via <code>Tree.from_linkage</code></li>
         <li>Add named label sets without rebuilding trees</li>
       </ul>

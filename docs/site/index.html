@@ -37,7 +37,7 @@
       <h2>Minimal example</h2>
       <pre><code>from orchard import OrchardBuilder
 
-orchard = OrchardBuilder().build([
+orchard = OrchardBuilder(allow_offline_fallback=True).build([
     "Schedule a calendar reminder for tomorrow morning.",
     "Send an email summary of the weekly status notes.",
     "Create a task to review the draft proposal.",
@@ -46,10 +46,15 @@ orchard = OrchardBuilder().build([
 print(orchard.tree_ids)  # ('domain', 'function')
 domain = orchard.tree("domain")
 orchard.save("artifacts/demo_orchard")</code></pre>
+      <p>Neural extras (<code>orchard[ml]</code>) make <code>OrchardBuilder().build</code> use fused MiniLM + TF-IDF + packaged heads. Clean-env CI uses the offline opt-in above.</p>
       <h2>Semantic-only tree</h2>
       <pre><code>from orchard import OrchardBuilder
+from orchard.backends.tfidf import TfidfEmbeddingBackend
 
-orchard = OrchardBuilder(taxonomies=[]).build(documents)
+orchard = OrchardBuilder(
+    taxonomies=[],
+    embedding_backend=TfidfEmbeddingBackend(),
+).build(documents)
 semantic = orchard.tree("semantic")</code></pre>
       <h2>Next</h2>
       <p>Read <a href="architecture.html">Architecture</a> for the object model, or <a href="building-trees.html">Building Trees</a> for builder options.</p>

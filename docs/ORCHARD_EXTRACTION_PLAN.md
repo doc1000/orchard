@@ -1,5 +1,11 @@
 # Orchard Extraction Plan
 
+> **Historical.** This document records how Orchard was first carved out of
+> the demo. Do **not** treat its non-goals as current product law. Per-tree
+> fused profiles are in scope (`docs/DECISIONS.md`,
+> `docs/FUSED_SIMILARITY_PLAN.md`). There is still no single orchard tree
+> named `fused` / `mixed`.
+
 Standalone extraction of working Orchard logic from `../tool-tree-demo` (reference only; do not refactor it).
 
 **Architecture source:** `docs/ORCHARD_ARCHITECTURE.md`  
@@ -9,7 +15,7 @@ Standalone extraction of working Orchard logic from `../tool-tree-demo` (referen
 ## Target architecture (summary)
 
 - `Orchard` is multi-tree by default over one shared document corpus.
-- Configured taxonomies → **one tree per taxonomy** (not a fused/mixed default tree).
+- Configured taxonomies → **one named tree per taxonomy** (per-tree fusion is in scope; still not a mixed orchard tree named `fused`).
 - No taxonomies → single **semantic** tree from semantic similarity.
 - Built-in Domain and Function taxonomy artifacts are first-class examples (no AppWorld dependency).
 - Public construction verb is `build`.
@@ -38,7 +44,7 @@ Signatures may refine; keep this shape.
 
 ### Non-goals
 
-AppWorld / retrieval / BigTool; Postgres Orchard; online mutation / grafting; auto best-tree; cross-tree navigation; fused default trees; contrastive label generation; distributed/hosted features; vector DB productization; major numerical redesign; heavy validation frameworks.
+AppWorld / retrieval / BigTool; Postgres Orchard; online mutation / grafting; auto best-tree; cross-tree navigation; ~~fused default trees~~ *(reversed for **per-tree** fusion; still no mixed orchard tree)*; contrastive label generation; distributed/hosted features; vector DB productization; major numerical redesign; heavy validation frameworks.
 
 ---
 

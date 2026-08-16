@@ -1,0 +1,53 @@
+{
+  "classes_": [
+    "domain.commerce",
+    "domain.communication",
+    "domain.documentation",
+    "domain.files",
+    "domain.finance",
+    "domain.identity",
+    "domain.media",
+    "domain.notes",
+    "domain.phone",
+    "domain.system_orchestration",
+    "domain.work"
+  ],
+  "classes_order": "sklearn_alphabetical_student",
+  "estimator": "sklearn.linear_model._logistic.LogisticRegression",
+  "export_date": "2026-08-15",
+  "feature_model": {
+    "batch_size": 16,
+    "dimensions": 768,
+    "id": "answerdotai/ModernBERT-base",
+    "max_length": 512,
+    "pooling": "attention-mask-aware mean pooling",
+    "revision": "8949b909ec900327062f0ebf497f51aef5e6f0c8"
+  },
+  "label_order": [
+    "domain.identity",
+    "domain.commerce",
+    "domain.finance",
+    "domain.communication",
+    "domain.files",
+    "domain.work",
+    "domain.media",
+    "domain.notes",
+    "domain.phone",
+    "domain.documentation",
+    "domain.system_orchestration"
+  ],
+  "logistic": {
+    "C": 0.1,
+    "class_weight": "balanced",
+    "max_iter": 1000,
+    "random_state": 20260725
+  },
+  "remap": "stored classes_ are student/sklearn-alphabetical; runtime remaps predict_proba columns onto packaged label_order",
+  "schema_version": "orchard_taxonomy_head_v1",
+  "sklearn_version": "1.8.0",
+  "source_student": "domain_taxonomy_v0_student.joblib",
+  "source_student_sha256": "b927c99282099f322396b5671e58d2796d2f6c23ff8e1241f2bd6fe609b4021b",
+  "taxonomy_definition_sha256": "455c810df20510ce6ff5549e1d2328b82e10fb5aa636927dba8e29fadfc56054",
+  "taxonomy_name": "domain",
+  "taxonomy_version": "orchard_taxonomy_v1"
+}

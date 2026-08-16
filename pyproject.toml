@@ -19,6 +19,14 @@ embeddings = [
     "torch>=2.2",
     "transformers>=4.41",
 ]
+taxonomy-ml = [
+    "torch>=2.2",
+    "transformers>=4.41",
+]
+ml = [
+    "torch>=2.2",
+    "transformers>=4.41",
+]
 
 [tool.ruff]
 line-length = 100
