@@ -1,5 +1,6 @@
 """Pluggable feature and similarity backends for OrchardBuilder."""
 
+from orchard.backends.family import AppExactMatchLayer
 from orchard.backends.fusion import (
     SimilarityProfile,
     fuse_to_dissimilarity,
@@ -40,6 +41,7 @@ from orchard.backends.taxonomy_heads import (
 from orchard.backends.tfidf import TfidfEmbeddingBackend, tfidf_matrix
 
 __all__ = [
+    "AppExactMatchLayer",
     "LayerRegistry",
     "MatrixLayer",
     "MiniLMCosineLayer",

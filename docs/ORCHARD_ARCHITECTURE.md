@@ -271,7 +271,10 @@ below_size_limit
 compressed
 ```
 
-NPZ is sufficient initially.
+Default is **`never`**. `OrchardBuilder.layer_matrix_persist` writes already
+computed layer matrices as `layer_matrices.npz` (checksums stay in
+metadata). NPZ is sufficient initially. See `docs/DECISIONS.md` for the
+AppWorld D-027–D-031 mapping.
 
 ### Cached / derived
 

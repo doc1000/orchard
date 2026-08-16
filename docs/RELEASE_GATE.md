@@ -22,3 +22,6 @@ Gates apply to the standalone Orchard repository. Use generic fixtures only.
 - [x] Incremental corpus mutation is explicitly unsupported.
 - [x] README minimal example runs as an automated test.
 - [x] Local documentation site opens without a build server and covers the public API areas.
+- [x] Fusion extras (`orchard[embeddings]`, `orchard[taxonomy-ml]`, `orchard[ml]`) are optional; clean-env / CI uses `allow_offline_fallback=True` or explicit TF-IDF / cue. Missing extras fail loudly (`MissingOptionalDependencyError`); no silent MiniLM→TF-IDF swap.
+- [x] Partial family metadata with `family_metadata_key` or a profile that names `app_exact_match` raises; weights are not dropped and renormalized.
+- [x] No orchard tree is named `fused` or `mixed`. Named trees stay `domain` / `function` / `semantic`.

@@ -15,6 +15,12 @@ from orchard.assets.profiles import (
     load_semantic_weights,
     load_taxonomy_weights,
 )
+from orchard.backends.family import (
+    DEFAULT_FAMILY_METADATA_KEY,
+    FAMILY_LAYER_NAME,
+    AppExactMatchLayer,
+    require_family_metadata,
+)
 from orchard.backends.fusion import (
     FUSION_MODES,
     SimilarityProfile,
@@ -61,6 +67,12 @@ from orchard.taxonomy import Taxonomy, default_taxonomies
 from orchard.tree import Tree
 
 _UNSET: Any = object()
+LAYER_MATRIX_PERSIST_POLICIES = (
+    "always",
+    "never",
+    "below_size_limit",
+    "compressed",
+)
 
 
 def _matrix_checksum(matrix: np.ndarray) -> str:
@@ -114,7 +126,9 @@ class OrchardBuilder:
     There is no orchard tree named ``fused`` / ``mixed``. Per-tree fusion is
     how each named tree's matrix is made. Variance-calibrated fusion needs
     n≥3 documents (a selected layer with off-diagonal variance ≤ 1e-12 aborts).
-    Public construction verb is ``build`` (not ``fit_transform``).
+    ``family_metadata_key`` opts into ``app_exact_match`` when every document
+    has a non-empty value; partial metadata is a loud error. Public
+    construction verb is ``build`` (not ``fit_transform``).
     """
 
     taxonomies: Any = field(default=_UNSET)
@@ -131,9 +145,21 @@ class OrchardBuilder:
     taxonomy_weights: Mapping[str, Mapping[str, float]] | None = None
     allow_offline_fallback: bool = False
     description_transform: str = "centered"
+    family_metadata_key: str | None = None
+    layer_matrix_persist: Literal[
+        "always", "never", "below_size_limit", "compressed"
+    ] = "never"
     metadata: dict[str, Any] = field(default_factory=dict)
     _offline_fallback: bool = field(init=False, repr=False, default=False)
     _default_taxonomy_build: bool = field(init=False, repr=False, default=False)
+    _app_exact_match_active: bool = field(init=False, repr=False, default=False)
+    _base_profiles: dict[str, SimilarityProfile] = field(
+        init=False, repr=False, default_factory=dict
+    )
+    _caller_profile_tree_ids: set[str] = field(
+        init=False, repr=False, default_factory=set
+    )
+    _family_lookup_key: str | None = field(init=False, repr=False, default=None)
 
     def __post_init__(self) -> None:
         if self.taxonomy_similarity not in {"jensen_shannon", "cosine"}:
@@ -148,6 +174,17 @@ class OrchardBuilder:
             raise InvalidIdentityError(
                 "description_transform must be one of: "
                 + ", ".join(DESCRIPTION_TRANSFORMS)
+            )
+        if self.family_metadata_key is not None and not str(
+            self.family_metadata_key
+        ).strip():
+            raise InvalidIdentityError(
+                "family_metadata_key must be a non-empty string or None"
+            )
+        if self.layer_matrix_persist not in LAYER_MATRIX_PERSIST_POLICIES:
+            raise InvalidIdentityError(
+                "layer_matrix_persist must be one of: "
+                + ", ".join(LAYER_MATRIX_PERSIST_POLICIES)
             )
         self._default_taxonomy_build = self.taxonomies is _UNSET or self.taxonomies is None
         if self.taxonomies is _UNSET or self.taxonomies is None:
@@ -166,7 +203,9 @@ class OrchardBuilder:
             self.lexical_backend = TfidfEmbeddingBackend()
         self._resolve_taxonomy_classifier_backend()
         self._resolve_embedding_backend()
+        self._caller_profile_tree_ids = self._caller_override_tree_ids()
         self.profiles = self._resolve_profiles()
+        self._base_profiles = dict(self.profiles)
 
     def get_params(self) -> dict[str, Any]:
         """Inspectable builder configuration (sklearn-style)."""
@@ -208,6 +247,9 @@ class OrchardBuilder:
             ),
             "allow_offline_fallback": self.allow_offline_fallback,
             "description_transform": self.description_transform,
+            "family_metadata_key": self.family_metadata_key,
+            "app_exact_match_active": self._app_exact_match_active,
+            "layer_matrix_persist": self.layer_matrix_persist,
             "offline_fallback": self._offline_fallback,
             "model_id": (
                 getattr(backend, "model_id", MINILM_MODEL_ID) if minilm_active else None
@@ -244,6 +286,8 @@ class OrchardBuilder:
         documents: Sequence[Document | str | Mapping[str, Any]],
     ) -> Orchard:
         docs = normalize_documents(documents)
+        self.profiles = dict(self._base_profiles)
+        self._prepare_family_layer(docs)
         layer_matrices = self._compute_shared_layers(docs)
         trees: dict[str, Tree] = {}
 
@@ -272,7 +316,11 @@ class OrchardBuilder:
                     tree_id: self.profiles[tree_id].to_dict() for tree_id in trees
                 },
                 "taxonomy_transform": self._taxonomy_transform_kind(),
+                "family_metadata_key": self.family_metadata_key,
+                "app_exact_match_active": self._app_exact_match_active,
+                "layer_matrix_persist": self.layer_matrix_persist,
             },
+            layer_matrices=layer_matrices,
         )
 
     def _build_semantic_tree(
@@ -412,10 +460,81 @@ class OrchardBuilder:
                     transform=self.description_transform,
                 )
             )
+        if self._app_exact_match_active and self._family_lookup_key:
+            layers.append(AppExactMatchLayer(metadata_key=self._family_lookup_key))
         for taxonomy in self.taxonomies:
             layers.append(TaxonomyJsLayer(taxonomy=taxonomy))
             layers.append(TaxonomyCosineLayer(taxonomy=taxonomy))
         return LayerRegistry(layers)
+
+    def _caller_override_tree_ids(self) -> set[str]:
+        names: set[str] = set()
+        if self.profiles is not None:
+            names.update(str(tree_id) for tree_id in self.profiles)
+        if self.taxonomy_weights is not None:
+            names.update(str(tree_id) for tree_id in self.taxonomy_weights)
+        if self.semantic_weights is not None:
+            names.add("semantic")
+        return names
+
+    def _effective_family_key(self) -> str:
+        if self.family_metadata_key:
+            return str(self.family_metadata_key)
+        return DEFAULT_FAMILY_METADATA_KEY
+
+    def _can_auto_enable_family(self) -> bool:
+        return self._uses_minilm() and not self._offline_fallback
+
+    def _will_use_family_layer(self) -> bool:
+        for tree_id in self._planned_tree_ids():
+            profile = self.profiles.get(tree_id)
+            if profile is not None and FAMILY_LAYER_NAME in profile.weights:
+                return True
+        if not (self.family_metadata_key and self._can_auto_enable_family()):
+            return False
+        return any(
+            tree_id in TAXONOMY_PROFILE_NAMES
+            and tree_id not in self._caller_profile_tree_ids
+            for tree_id in self._planned_tree_ids()
+        )
+
+    def _apply_with_app_defaults(self) -> None:
+        if not (self.family_metadata_key and self._can_auto_enable_family()):
+            return
+        taxonomy_names = [taxonomy.name for taxonomy in self.taxonomies]
+        minilm_layer = layer_name_for_transform(self.description_transform)
+        for tree_id in self._planned_tree_ids():
+            if tree_id == "semantic":
+                continue
+            if tree_id in self._caller_profile_tree_ids:
+                continue
+            if tree_id not in TAXONOMY_PROFILE_NAMES or not self._uses_minilm():
+                continue
+            self.profiles[tree_id] = SimilarityProfile(
+                name=tree_id,
+                weights=load_taxonomy_weights(
+                    tree_id,
+                    taxonomy_names=taxonomy_names,
+                    minilm_layer=minilm_layer,
+                    with_app=True,
+                ),
+                fusion_mode=self.fusion_mode,
+            )
+
+    def _prepare_family_layer(self, documents: Sequence[Document]) -> None:
+        self._app_exact_match_active = False
+        self._family_lookup_key = None
+        if not self._will_use_family_layer():
+            return
+        key = self._effective_family_key()
+        require_family_metadata(documents, key)
+        self._apply_with_app_defaults()
+        self._family_lookup_key = key
+        self._app_exact_match_active = any(
+            FAMILY_LAYER_NAME in self.profiles[tree_id].weights
+            for tree_id in self._planned_tree_ids()
+            if tree_id in self.profiles
+        )
 
     def _planned_tree_ids(self) -> list[str]:
         if not self.taxonomies:

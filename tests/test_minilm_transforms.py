@@ -127,6 +127,27 @@ def test_injected_minilm_semantic_build_uses_fused_default() -> None:
     assert params["offline_fallback"] is False
 
 
+def test_non_default_description_transform_remaps_layer_name() -> None:
+    documents = load_documents()
+    vectors = _fake_vectors(len(documents), dim=8)
+    backend = MiniLMEmbeddingBackend(encode_fn=lambda _texts: vectors)
+    builder = OrchardBuilder(
+        taxonomies=[],
+        embedding_backend=backend,
+        description_transform="whitened",
+    )
+    params = builder.get_params()
+    assert params["description_transform"] == "whitened"
+    assert params["profiles"]["semantic"]["weights"] == {
+        "description_minilm_whitened_cosine": 0.66,
+        "tfidf_cosine": 0.34,
+    }
+    assert "description_minilm_centered_cosine" not in params["active_layers"]["semantic"]
+    orchard = builder.build(documents)
+    assert orchard.tree_ids == ("semantic",)
+    assert "description_minilm_whitened_cosine" in orchard.metadata["layer_checksums"]
+
+
 def test_explicit_tfidf_backend_stays_tfidf_only() -> None:
     documents = load_documents()
     builder = OrchardBuilder(

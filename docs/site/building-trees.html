@@ -53,6 +53,12 @@ orchard = OrchardBuilder(
     profiles={"domain": SimilarityProfile(name="domain", weights={"domain_raw_js": 1.0})}
 ).build(documents)</code></pre>
       <p>Default neural profiles are MiniLM + document TF-IDF + taxonomy Jensen–Shannon, fused with <code>variance_calibrated</code> (n≥3). Tree names stay <code>domain</code> / <code>function</code> / <code>semantic</code> — there is no tree named <code>fused</code>.</p>
+      <h2>App-family layer</h2>
+      <p>Set <code>family_metadata_key</code> (for example <code>"app_name"</code> or <code>"family"</code>) only when every document has a non-empty value for that key. Domain/function then use the packaged with-app weight dicts (<code>app_exact_match=0.03</code>). Partial or empty metadata raises; Orchard does not drop the layer and renormalize. Semantic stays MiniLM <code>0.66</code> / TF-IDF <code>0.34</code>. Offline fallback and explicit TF-IDF paths stay single-layer.</p>
+      <pre><code>builder = OrchardBuilder(family_metadata_key="app_name")
+orchard = builder.build(documents)</code></pre>
+      <h2>Diagnostic MiniLM transforms</h2>
+      <p>Default <code>description_transform</code> is <code>"centered"</code>. <code>"raw"</code>, <code>"whitened"</code>, and <code>"centered_pc3"</code> are diagnostic overrides; they remap the MiniLM layer name in <code>get_params()</code>.</p>
     </main>
   </div>
   <script src="assets/site.js"></script>

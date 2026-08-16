@@ -39,20 +39,24 @@ def load_taxonomy_weights(
     *,
     taxonomy_names: Sequence[str],
     minilm_layer: str,
+    with_app: bool = False,
 ) -> dict[str, float]:
-    """Return the packaged no-app taxonomy dict for the present layer subset.
+    """Return the packaged taxonomy dict for the present layer subset.
 
     Both Domain and Function present → cross-taxonomy JS dict.
     Only one of those taxonomies → matching single-taxonomy dict (missing JS
     layer is absent; never renormalized).
+    ``with_app=True`` selects the G3 ``app_exact_match=0.03`` dicts.
     """
     if tree_id not in TAXONOMY_PROFILE_NAMES:
         raise ValueError(f"no packaged taxonomy profile for {tree_id!r}")
     payload = load_profile_payload(tree_id)
     present = set(taxonomy_names)
     other = "function" if tree_id == "domain" else "domain"
-    if other in present:
-        weights = dict(payload["weights"])
+    if with_app:
+        key = "with_app_weights" if other in present else "with_app_single_taxonomy_weights"
+    elif other in present:
+        key = "weights"
     else:
-        weights = dict(payload["single_taxonomy_weights"])
-    return _rename_minilm_layer(weights, minilm_layer)
+        key = "single_taxonomy_weights"
+    return _rename_minilm_layer(dict(payload[key]), minilm_layer)

@@ -13,13 +13,27 @@
     "description_minilm_centered_cosine": 0.23,
     "tfidf_cosine": 0.14
   },
+  "with_app_weights": {
+    "app_exact_match": 0.03,
+    "description_minilm_centered_cosine": 0.23,
+    "domain_raw_js": 0.45,
+    "function_raw_js": 0.15,
+    "tfidf_cosine": 0.14
+  },
+  "with_app_single_taxonomy_weights": {
+    "app_exact_match": 0.03,
+    "description_minilm_centered_cosine": 0.23,
+    "domain_raw_js": 0.60,
+    "tfidf_cosine": 0.14
+  },
   "provenance": {
-    "decisions": ["D-002", "D-027", "D-030"],
-    "source": "AppWorld Phase 3B no-app domain profile; 0.03 app_exact_match folded into domain_raw_js",
+    "decisions": ["D-002", "D-027", "D-030", "D-O-008"],
+    "source": "AppWorld Phase 3B / G3 domain profile; keyword_tfidf_cosine renamed to tfidf_cosine",
     "notes": [
       "Both-taxonomy dict includes function_raw_js (AppWorld functional_raw_js).",
       "Single-taxonomy dict omits the missing JS layer; do not renormalize at runtime.",
-      "No app_exact_match in this phase."
+      "No-app dicts fold 0.03 app_exact_match into domain_raw_js.",
+      "with_app_* dicts are used only when the family layer is actually enabled."
     ]
   }
 }

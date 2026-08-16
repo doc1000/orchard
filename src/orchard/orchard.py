@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+import numpy as np
+
 from orchard.document import Document
 from orchard.exceptions import (
     CorpusMutationUnsupportedError,
@@ -20,6 +22,9 @@ from orchard.schemas import (
     LABEL_SET_SCHEMA_VERSION,
 )
 from orchard.tree import Tree
+
+LAYER_MATRICES_FILENAME = "layer_matrices.npz"
+LAYER_MATRIX_SIZE_LIMIT_BYTES = 8 * 1024 * 1024
 
 
 def _write_json(path: Path, value: Any) -> None:
@@ -42,6 +47,7 @@ class Orchard:
     documents: list[Document]
     trees: dict[str, Tree] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
+    layer_matrices: dict[str, np.ndarray] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         ensure_unique_item_ids(doc.item_id for doc in self.documents)
@@ -71,11 +77,16 @@ class Orchard:
         documents: Sequence[Document],
         trees: Mapping[str, Tree],
         metadata: Mapping[str, Any] | None = None,
+        layer_matrices: Mapping[str, np.ndarray] | None = None,
     ) -> Orchard:
         return cls(
             documents=list(documents),
             trees=dict(trees),
             metadata=dict(metadata or {}),
+            layer_matrices={
+                name: np.asarray(matrix, dtype=np.float64)
+                for name, matrix in dict(layer_matrices or {}).items()
+            },
         )
 
     @property
@@ -141,6 +152,7 @@ class Orchard:
             "metadata": self.metadata,
         }
         _write_json(root / "manifest.json", manifest)
+        self._persist_layer_matrices(root)
         return root
 
     @classmethod
@@ -188,4 +200,30 @@ class Orchard:
             documents=documents,
             trees=trees,
             metadata=dict(manifest.get("metadata") or {}),
+            layer_matrices=_load_layer_matrices(root),
         )
+
+    def _persist_layer_matrices(self, root: Path) -> None:
+        policy = str(self.metadata.get("layer_matrix_persist") or "never")
+        if policy == "never" or not self.layer_matrices:
+            return
+        arrays = {
+            name: np.ascontiguousarray(matrix, dtype=np.float64)
+            for name, matrix in self.layer_matrices.items()
+        }
+        nbytes = sum(matrix.nbytes for matrix in arrays.values())
+        if policy == "below_size_limit" and nbytes > LAYER_MATRIX_SIZE_LIMIT_BYTES:
+            return
+        path = root / LAYER_MATRICES_FILENAME
+        if policy == "compressed":
+            np.savez_compressed(path, **arrays)
+        else:
+            np.savez(path, **arrays)
+
+
+def _load_layer_matrices(root: Path) -> dict[str, np.ndarray]:
+    path = root / LAYER_MATRICES_FILENAME
+    if not path.is_file():
+        return {}
+    with np.load(path) as payload:
+        return {name: np.asarray(payload[name], dtype=np.float64) for name in payload.files}

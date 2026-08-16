@@ -64,6 +64,25 @@ assert orchard.tree_ids == ("domain", "function")
 
 Variance-calibrated fusion needs n≥3 documents.
 
+Optional app-family layer (complete metadata required; partial values error):
+
+```python
+from orchard import Document, OrchardBuilder
+
+documents = [
+    Document(text="Send an email digest.", metadata={"app_name": "mail"}),
+    Document(text="Archive last week's mail.", metadata={"app_name": "mail"}),
+    Document(text="Create a calendar event.", metadata={"app_name": "calendar"}),
+    Document(text="List tomorrow's meetings.", metadata={"app_name": "calendar"}),
+]
+builder = OrchardBuilder(family_metadata_key="app_name")
+orchard = builder.build(documents)
+assert builder.get_params()["app_exact_match_active"] is True
+```
+
+Diagnostic MiniLM transforms (`raw`, `whitened`, `centered_pc3`) remap the
+description layer name. Default `description_transform` stays `"centered"`.
+
 ## Docs
 
 Open [`docs/site/index.html`](docs/site/index.html) in a browser (no build server). See also `docs/ORCHARD_ARCHITECTURE.md`, `docs/DECISIONS.md`, and `CODE_MANIFEST.md`.
