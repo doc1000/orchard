@@ -31,34 +31,270 @@
 </aside>
     <main class="content">
       <h1>Building Trees</h1>
-      <pre><code>from orchard import OrchardBuilder, DomainTaxonomy, FunctionTaxonomy, SimilarityProfile
+      <p class="lede">Building produces linkage — the hierarchy. Names do not change that structure. Label the tree before you judge whether a <em>cut</em> is good; fingerprints still work unlabeled.</p>
+
+      <div class="callout default">
+        <div class="kicker">Defaults (online)</div>
+        <p><code>OrchardBuilder().build(documents)</code> needs <code>orchard[ml]</code> (MiniLM + ModernBERT). It builds <code>domain</code> and <code>function</code> trees. Fusion is <code>variance_calibrated</code>. MiniLM transform is <code>"centered"</code>. Layer matrices are <em>not</em> saved unless you set <code>layer_matrix_persist</code> (recommended: <code>"always"</code> if you will cut with Calinski–Harabasz later). No label sets are created.</p>
+      </div>
+
+      <h2>Procedure</h2>
+      <ol class="steps">
+        <li>Load <a href="documents.html">documents</a>.</li>
+        <li>Choose taxonomies (or none) and the text embedding (MiniLM vs TF-IDF).</li>
+        <li><code>builder.build(documents)</code> → an <code>Orchard</code> of trees (no node names yet).</li>
+        <li><a href="labels.html">Label</a> the tree you want to read.</li>
+        <li><a href="#compare">Compare</a> fingerprints and cuts (Calinski–Harabasz).</li>
+      </ol>
+      <pre><code>from orchard import OrchardBuilder
+
+builder = OrchardBuilder(layer_matrix_persist="always")
+orchard = builder.build(documents)
+print(orchard.tree_ids)          # ('domain', 'function')
+print(builder.get_params())      # backends, weights, taxonomy_transform
+domain = orchard.tree("domain")  # structure only; no labels yet</code></pre>
+
+      <h2 id="routes">Routes</h2>
+
+      <h3 id="online-fused">Online fused Domain + Function (usual)</h3>
+      <p><strong>Input:</strong> documents; MiniLM extra; ModernBERT extra.<br />
+         <strong>Result:</strong> trees <code>domain</code> and <code>function</code>. Each fuses MiniLM + document TF-IDF + both taxonomy JS layers.</p>
+      <pre><code>orchard = OrchardBuilder().build(documents)
+assert orchard.tree_ids == ("domain", "function")</code></pre>
+      <p>No-app weights (default): domain is mostly <code>domain_raw_js</code> (0.48) plus MiniLM 0.23, TF-IDF 0.14, <code>function_raw_js</code> 0.15. Function tree is the mirror (0.48 / 0.25 / 0.15 / 0.12). Variance-calibrated fusion needs n≥3.</p>
+
+      <h3 id="semantic-minilm">No-taxonomy tree from semantic embeddings (MiniLM)</h3>
+      <p>TF-IDF is <em>not</em> this path. This is MiniLM meaning similarity, optionally still mixed with a smaller TF-IDF lexical layer.</p>
+      <p><strong>Input:</strong> documents; <code>taxonomies=[]</code>; MiniLM available or injected.<br />
+         <strong>Result:</strong> one tree named <code>semantic</code>. Default weights: MiniLM 0.66 / TF-IDF 0.34.</p>
+      <pre><code>from orchard import OrchardBuilder
+from orchard.backends.minilm import MiniLMEmbeddingBackend
+
+orchard = OrchardBuilder(taxonomies=[]).build(documents)
+# or be explicit:
+orchard = OrchardBuilder(
+    taxonomies=[],
+    embedding_backend=MiniLMEmbeddingBackend(),
+    layer_matrix_persist="always",
+).build(documents)
+tree = orchard.tree("semantic")</code></pre>
+      <p>To also keep this tree next to Domain/Function: <code>include_semantic_with_taxonomies=True</code> (default is <code>False</code>).</p>
+
+      <h3 id="lexical-tfidf">No-taxonomy tree from lexical TF-IDF</h3>
+      <p>Overlapping words only. Pass the TF-IDF backend on purpose. Do not call this semantic.</p>
+      <pre><code>from orchard import OrchardBuilder
 from orchard.backends.tfidf import TfidfEmbeddingBackend
 
-# neural extras (or injected MiniLM + heads): fused domain + function
-builder = OrchardBuilder()
-orchard = builder.build(documents)
-params = builder.get_params()  # fusion_mode, per-tree weights, backends
-
-# clean-env / CI: single-layer cue JS + TF-IDF
-orchard = OrchardBuilder(allow_offline_fallback=True).build(documents)
-
-# semantic only (explicit TF-IDF)
 orchard = OrchardBuilder(
     taxonomies=[],
     embedding_backend=TfidfEmbeddingBackend(),
 ).build(documents)
+tree = orchard.tree("semantic")   # tree id only; embedding is lexical
+# weights: tfidf_cosine = 1.0</code></pre>
 
-# override a tree profile (weights must sum to 1)
+      <h3 id="offline">Offline fallback (explicit)</h3>
+      <p>No MiniLM, no ModernBERT. Cue JS for each packaged taxonomy, TF-IDF-only for a no-taxonomy tree. Provenance records <code>offline_fallback</code>. This is not silent.</p>
+      <pre><code>orchard = OrchardBuilder(allow_offline_fallback=True).build(documents)
+# trees: domain + function, each own-taxonomy JS = 1.0
+# taxonomy_transform == "cue"</code></pre>
+
+      <h3 id="custom-taxonomy">Your trained taxonomy</h3>
+      <pre><code>from orchard import OrchardBuilder
+
+# topic already has a ModernBERT head — see Taxonomies
+orchard = OrchardBuilder(taxonomies=[topic]).build(documents)
+# without profiles=, this tree is topic_raw_js only (weight 1.0)
+# to mix MiniLM + TF-IDF + taxonomy JS, set weights (next section)</code></pre>
+      <p>Train/load the head on <a href="taxonomies.html">Taxonomies</a>.</p>
+
+      <h2 id="weights">Set fusion weights (explicit)</h2>
+      <p>Each named tree is a weighted mix of independent <code>[n, n]</code> layers. There is no tree named <code>fused</code>. You pass a <code>profiles</code> dict keyed by <strong>tree id</strong> (the taxonomy <code>name</code>, or <code>"semantic"</code>).</p>
+      <p><strong>Rules:</strong> every key is a layer name that will exist at build time. Values are non-negative and must sum to <strong>exactly 1.0</strong> (not repaired). Default fusion mode is <code>variance_calibrated</code>.</p>
+
+      <h3>Layer names you can put in <code>weights</code></h3>
+      <table>
+        <thead>
+          <tr><th>Layer key</th><th>What it is</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>description_minilm_centered_cosine</code></td><td>MiniLM semantic (default transform). Changes if you set <code>description_transform</code>.</td></tr>
+          <tr><td><code>tfidf_cosine</code></td><td>Lexical TF-IDF on document text.</td></tr>
+          <tr><td><code>{name}_raw_js</code></td><td>Jensen–Shannon on that taxonomy’s ModernBERT probabilities. For <code>name="topic"</code> this is <code>topic_raw_js</code>.</td></tr>
+          <tr><td><code>{name}_cosine</code></td><td>Only if <code>taxonomy_similarity="cosine"</code>.</td></tr>
+          <tr><td><code>app_exact_match</code></td><td>Only with complete <code>family_metadata_key</code> metadata.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Custom taxonomy, fused (copy this)</h3>
+      <pre><code>from orchard import OrchardBuilder, SimilarityProfile
+
+# weights must sum to 1.0
+topic_weights = {
+    "description_minilm_centered_cosine": 0.50,  # semantic MiniLM
+    "tfidf_cosine": 0.20,                        # lexical TF-IDF
+    "topic_raw_js": 0.30,                        # your taxonomy JS
+}
+
+builder = OrchardBuilder(
+    taxonomies=[topic],
+    profiles={
+        "topic": SimilarityProfile(
+            name="topic",
+            weights=topic_weights,
+            fusion_mode="variance_calibrated",  # default; or "raw_convex"
+        ),
+    },
+    layer_matrix_persist="always",
+)
+orchard = builder.build(documents)
+print(builder.get_params()["profiles"]["topic"]["weights"])
+# {'description_minilm_centered_cosine': 0.50, 'tfidf_cosine': 0.20, 'topic_raw_js': 0.30}</code></pre>
+      <p>Same thing as a plain dict (the dict key is the tree id; <code>fusion_mode</code> comes from the builder):</p>
+      <pre><code>builder = OrchardBuilder(
+    taxonomies=[topic],
+    profiles={"topic": topic_weights},
+    fusion_mode="variance_calibrated",
+)</code></pre>
+
+      <h3>Override packaged Domain / Function</h3>
+      <pre><code>from orchard import OrchardBuilder, SimilarityProfile
+
 orchard = OrchardBuilder(
-    profiles={"domain": SimilarityProfile(name="domain", weights={"domain_raw_js": 1.0})}
+    profiles={
+        "domain": SimilarityProfile(
+            name="domain",
+            weights={
+                "domain_raw_js": 0.48,
+                "description_minilm_centered_cosine": 0.23,
+                "tfidf_cosine": 0.14,
+                "function_raw_js": 0.15,
+            },
+        ),
+        "function": SimilarityProfile(
+            name="function",
+            weights={
+                "function_raw_js": 0.48,
+                "description_minilm_centered_cosine": 0.25,
+                "tfidf_cosine": 0.15,
+                "domain_raw_js": 0.12,
+            },
+        ),
+    },
 ).build(documents)</code></pre>
-      <p>Default neural profiles are MiniLM + document TF-IDF + taxonomy Jensen–Shannon, fused with <code>variance_calibrated</code> (n≥3). Tree names stay <code>domain</code> / <code>function</code> / <code>semantic</code> — there is no tree named <code>fused</code>.</p>
-      <h2>App-family layer</h2>
-      <p>Set <code>family_metadata_key</code> (for example <code>"app_name"</code> or <code>"family"</code>) only when every document has a non-empty value for that key. Domain/function then use the packaged with-app weight dicts (<code>app_exact_match=0.03</code>). Partial or empty metadata raises; Orchard does not drop the layer and renormalize. Semantic stays MiniLM <code>0.66</code> / TF-IDF <code>0.34</code>. Offline fallback and explicit TF-IDF paths stay single-layer.</p>
+      <p>Those numbers are the packaged no-app defaults. Change them; keep the sum at 1.0. Inspect whatever was used with <code>builder.get_params()["profiles"]</code>.</p>
+
+      <h3>No-taxonomy tree weights</h3>
+      <pre><code>OrchardBuilder(
+    taxonomies=[],
+    semantic_weights={
+        "description_minilm_centered_cosine": 0.66,
+        "tfidf_cosine": 0.34,
+    },
+)
+# equivalent:
+OrchardBuilder(
+    taxonomies=[],
+    profiles={"semantic": {
+        "description_minilm_centered_cosine": 0.66,
+        "tfidf_cosine": 0.34,
+    }},
+)</code></pre>
+      <p><code>taxonomy_weights={"topic": topic_weights}</code> is another way to pass the same mapping for a taxonomy tree if you are not using <code>profiles</code>.</p>
+
+      <h2 id="compare">Compare trees</h2>
+      <p>Two trees can share the same documents and still differ in linkage. <code>linkage_fingerprint</code> does not need names. To decide whether a <em>cut</em> is good, label first — see <a href="labels.html">Labels</a> — then walk the cut.</p>
+
+      <h3>Same linkage or not</h3>
+      <pre><code>a = orchard_a.tree("domain")
+b = orchard_b.tree("domain")
+same_structure = a.linkage_fingerprint() == b.linkage_fingerprint()
+print(same_structure, a.leaf_count, b.leaf_count)</code></pre>
+
+      <h3>Cluster quality at a cut (Calinski–Harabasz)</h3>
+      <p>This is the embedded tree-goodness score used by <code>top_criterion="optimal"</code>. Prefer a <strong>saved feature matrix</strong> (MiniLM layer, TF-IDF layer, or a taxonomy JS matrix). Do not silently switch to silhouette.</p>
+      <pre><code>from orchard import build_dynamic_cut
+from orchard.cuts import get_optimal_cut_labels
+
+# Preferred: layer saved at build time (layer_matrix_persist="always")
+X = orchard.layer_matrices["description_minilm_centered_cosine"]
+cut = build_dynamic_cut(
+    tree,
+    top_criterion="optimal",
+    cut_optimizer="calinski_harabasz_score",
+    feature_matrix=X,
+    min_width=2,
+    max_width=8,
+)
+print(cut["top_partition_count"], cut["cut_optimizer"])
+
+# Direct k-search on the same matrix (no nested cut)
+labels, k = get_optimal_cut_labels(
+    tree.linkage,
+    X,
+    metric="calinski_harabasz_score",
+)
+print("best k", k)</code></pre>
+      <p>If no layer matrix was saved, still run Calinski–Harabasz, but on <em>cophenetic distances from the linkage</em>. Say so out loud — that input is weaker, and it is not silhouette:</p>
+      <pre><code>from scipy.cluster.hierarchy import cophenet
+from scipy.spatial.distance import squareform
+
+cophenetic = squareform(cophenet(tree.linkage))
+cut = build_dynamic_cut(
+    tree,
+    top_criterion="optimal",
+    cut_optimizer="calinski_harabasz_score",
+    feature_matrix=cophenetic,   # explicit: C-H on cophenetic rows
+)
+print("feature source: cophenetic distances (no saved layer matrix)")</code></pre>
+      <div class="callout warn">
+        <strong>Do not omit <code>feature_matrix</code>.</strong>
+        <p>Calling <code>build_dynamic_cut(..., top_criterion="optimal")</code> with no matrix currently selects silhouette on cophenetic distances. That is the wrong default for tree quality. Always pass <code>cut_optimizer="calinski_harabasz_score"</code> and a matrix (saved layer, or cophenetic if that is all you have).</p>
+      </div>
+
+      <h3>Compare two structures at the same cut</h3>
+      <pre><code>from orchard import build_dynamic_cut, cut_partition_item_ids
+
+def top_groups(tree, orchard):
+    X = orchard.layer_matrices.get("description_minilm_centered_cosine")
+    if X is None:
+        X = squareform(cophenet(tree.linkage))
+        print("warning: scoring", tree.tree_id, "with cophenetic distances")
+    cut = build_dynamic_cut(
+        tree,
+        top_criterion="optimal",
+        cut_optimizer="calinski_harabasz_score",
+        feature_matrix=X,
+    )
+    return cut["top_partition_count"], cut_partition_item_ids(cut, tree)
+
+k_a, groups_a = top_groups(tree_a, orchard_a)
+k_b, groups_b = top_groups(tree_b, orchard_b)
+print(k_a, k_b)
+print(groups_a == groups_b)</code></pre>
+      <p>Walk nodes by level (with or without leaves) while you compare — helpers are on <a href="cuts-and-views.html#walk">Cuts &amp; Views</a>.</p>
+
+      <h2 id="family">App-family layer</h2>
+      <p>Default: off (<code>family_metadata_key=None</code>). Turn on only when <em>every</em> document has a non-empty value for that metadata key. Partial metadata raises; Orchard does not drop the layer and renormalize.</p>
       <pre><code>builder = OrchardBuilder(family_metadata_key="app_name")
-orchard = builder.build(documents)</code></pre>
-      <h2>Diagnostic MiniLM transforms</h2>
-      <p>Default <code>description_transform</code> is <code>"centered"</code>. <code>"raw"</code>, <code>"whitened"</code>, and <code>"centered_pc3"</code> are diagnostic overrides; they remap the MiniLM layer name in <code>get_params()</code>.</p>
+orchard = builder.build(documents)
+assert builder.get_params()["app_exact_match_active"] is True</code></pre>
+      <p>When on, Domain/Function use the with-app weight dicts (<code>app_exact_match=0.03</code>). The no-taxonomy tree stays MiniLM 0.66 / TF-IDF 0.34. Offline and explicit TF-IDF-only paths stay single-layer.</p>
+
+      <h2>Other builder knobs</h2>
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>fusion_mode</code></td><td><code>variance_calibrated</code></td><td>Alternative: <code>raw_convex</code>.</td></tr>
+          <tr><td><code>linkage_method</code></td><td><code>average</code></td><td>Ward is not used on this precomputed-dissimilarity path.</td></tr>
+          <tr><td><code>description_transform</code></td><td><code>centered</code></td><td><code>raw</code> / <code>whitened</code> / <code>centered_pc3</code> are diagnostic; they rename the MiniLM layer.</td></tr>
+          <tr><td><code>taxonomy_similarity</code></td><td><code>jensen_shannon</code></td><td>Alternative: <code>cosine</code>.</td></tr>
+          <tr><td><code>include_semantic_with_taxonomies</code></td><td><code>False</code></td><td>Also emit the no-taxonomy tree.</td></tr>
+          <tr><td><code>layer_matrix_persist</code></td><td><code>never</code></td><td>Use <code>always</code> if you will run optimal cuts. See <a href="persistence.html">Persistence</a>.</td></tr>
+          <tr><td><code>profiles</code></td><td>packaged weight dicts</td><td>See <a href="#weights">Set fusion weights</a>. Must sum to 1.</td></tr>
+        </tbody>
+      </table>
     </main>
   </div>
   <script src="assets/site.js"></script>

@@ -31,33 +31,65 @@
 </aside>
     <main class="content">
       <h1>Getting Started</h1>
-      <p class="muted">Local-first hierarchical trees over a fixed document corpus.</p>
+      <p class="lede">Local-first hierarchical trees over a fixed document corpus. Build structure first. Name nodes later.</p>
+
       <h2>Install</h2>
       <pre><code>uv pip install -e ".[dev]"</code></pre>
-      <h2>Minimal example</h2>
+      <p>Online defaults (MiniLM document embedding + packaged ModernBERT taxonomy heads):</p>
+      <pre><code>uv pip install -e ".[dev,ml]"</code></pre>
+
+      <div class="callout default">
+        <div class="kicker">Defaults</div>
+        <p>With <code>orchard[ml]</code>, <code>OrchardBuilder().build(documents)</code> builds <code>domain</code> and <code>function</code> trees from fused MiniLM (semantic) + TF-IDF (lexical) + ModernBERT taxonomy scores. No labels are attached. Layer matrices are not saved unless you set <code>layer_matrix_persist="always"</code>.</p>
+      </div>
+
+      <h2>Minimal example (online)</h2>
       <pre><code>from orchard import OrchardBuilder
 
-orchard = OrchardBuilder(allow_offline_fallback=True).build([
+documents = [
     "Schedule a calendar reminder for tomorrow morning.",
     "Send an email summary of the weekly status notes.",
     "Create a task to review the draft proposal.",
     "Find documents mentioning quarterly budget planning.",
-])
-print(orchard.tree_ids)  # ('domain', 'function')
+]
+builder = OrchardBuilder(layer_matrix_persist="always")
+orchard = builder.build(documents)
+print(orchard.tree_ids)       # ('domain', 'function')
 domain = orchard.tree("domain")
 orchard.save("artifacts/demo_orchard")</code></pre>
-      <p>Neural extras (<code>orchard[ml]</code>) make <code>OrchardBuilder().build</code> use fused MiniLM + TF-IDF + packaged heads. Clean-env CI uses the offline opt-in above.</p>
-      <h2>Semantic-only tree</h2>
+      <p>That <code>domain</code> tree has linkage only. Inspect it, cut it, compare it. Then see <a href="labels.html">Labels</a>.</p>
+
+      <h2>Minimal example (offline, explicit)</h2>
+      <p>Clean environments without extras must opt in. This path is lexical: cue-word taxonomy JS and/or TF-IDF. It is not MiniLM and not ModernBERT.</p>
       <pre><code>from orchard import OrchardBuilder
-from orchard.backends.tfidf import TfidfEmbeddingBackend
+
+orchard = OrchardBuilder(allow_offline_fallback=True).build(documents)
+print(orchard.tree_ids)  # ('domain', 'function')
+# taxonomy_transform == "cue"</code></pre>
+
+      <h2>No-taxonomy trees</h2>
+      <div class="split">
+        <div class="branch default">
+          <h3>Semantic embedding (MiniLM)</h3>
+          <pre><code>orchard = OrchardBuilder(taxonomies=[]).build(documents)
+tree = orchard.tree("semantic")
+# MiniLM 0.66 / TF-IDF 0.34</code></pre>
+        </div>
+        <div class="branch">
+          <h3>Lexical embedding (TF-IDF)</h3>
+          <pre><code>from orchard.backends.tfidf import TfidfEmbeddingBackend
 
 orchard = OrchardBuilder(
     taxonomies=[],
     embedding_backend=TfidfEmbeddingBackend(),
 ).build(documents)
-semantic = orchard.tree("semantic")</code></pre>
+tree = orchard.tree("semantic")  # name only; vectors are TF-IDF</code></pre>
+        </div>
+      </div>
+      <p>The tree id <code>"semantic"</code> means “no taxonomy.” It does not mean the embedding is semantic. Details: <a href="building-trees.html">Building Trees</a>.</p>
+
       <h2>Next</h2>
-      <p>Read <a href="architecture.html">Architecture</a> for the object model, or <a href="building-trees.html">Building Trees</a> for builder options.</p>
+      <p><a href="architecture.html">Architecture</a> for the flowchart and vocabulary. <a href="taxonomies.html">Taxonomies</a> for ModernBERT vs lexical scorers. <a href="cuts-and-views.html">Cuts &amp; Views</a> for Calinski–Harabasz cuts and walking levels.</p>
     </main>
   </div>
   <script src="assets/site.js"></script>

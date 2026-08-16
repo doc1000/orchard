@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Cuts & Views — Orchard</title>
+  <title>Cuts &amp; Views — Orchard</title>
   <link rel="stylesheet" href="assets/site.css" />
 </head>
 <body data-page="cuts-and-views">
@@ -31,14 +31,167 @@
 </aside>
     <main class="content">
       <h1>Cuts &amp; Views</h1>
-      <pre><code>from orchard import build_dynamic_cut, validate_dynamic_cut, pack_canonical_tree
+      <p class="lede">A cut is a cheap view over a finished tree. It does not rebuild linkage. Every cut still covers every leaf exactly once.</p>
 
-cut = build_dynamic_cut(tree, top_criterion="cluster_count", cluster_count=4,
-                        min_width=1, max_width=8, target_width=4)
+      <div class="callout default">
+        <div class="kicker">Defaults</div>
+        <p>Usual top cut: <code>top_criterion="optimal"</code> scored with <strong>Calinski–Harabasz</strong>. Width: <code>min_width=3</code>, <code>max_width=7</code>, <code>target_width=5</code>. Depth: <code>max_depth=4</code>. Pass a saved feature matrix. If you do not have one, pass cophenetic distances and say so — do not drop to silhouette.</p>
+      </div>
+
+      <h2 id="feature-matrix">Feature matrix first</h2>
+      <p>Optimal cuts score how clean a partition is. That score is only as good as the matrix you give it. After <code>build</code>, matrices live on <code>orchard.layer_matrices</code>. To still have them after <code>save</code>/<code>load</code>, set <code>layer_matrix_persist="always"</code> at build time (see <a href="persistence.html">Persistence</a>).</p>
+      <p>Typical keys:</p>
+      <ul>
+        <li><code>description_minilm_centered_cosine</code> — MiniLM semantic layer</li>
+        <li><code>tfidf_cosine</code> — lexical TF-IDF layer</li>
+        <li><code>domain_raw_js</code> / <code>function_raw_js</code> — taxonomy layers</li>
+      </ul>
+      <p>Any of these is an <code>[n, n]</code> similarity matrix. Passing it as <code>feature_matrix</code> treats each row as that document’s feature vector. That is the intended input for Calinski–Harabasz.</p>
+
+      <h2 id="top">Top-level cut: three options</h2>
+      <p><code>build_dynamic_cut</code> always needs <code>top_criterion</code>. Use <strong>optimal</strong> unless you have a reason not to.</p>
+
+      <h3 id="optimal">1. <code>optimal</code> (usual)</h3>
+      <p><strong>Input:</strong> tree + feature matrix + width bounds.<br />
+         <strong>Procedure:</strong> search cluster counts in <code>[min_width, max_width]</code> (at least 2). Keep the Calinski–Harabasz winner. Then recursively subcut with the same rule until width or <code>max_depth</code> stops it.<br />
+         <strong>Result:</strong> a nested cut. Read <code>cut["top_partition_count"]</code> and <code>cut["cut_optimizer"]</code>.</p>
+      <pre><code>from orchard import build_dynamic_cut, validate_dynamic_cut
+
+X = orchard.layer_matrices["description_minilm_centered_cosine"]
+cut = build_dynamic_cut(
+    tree,
+    top_criterion="optimal",
+    cut_optimizer="calinski_harabasz_score",
+    feature_matrix=X,
+    min_width=3,
+    max_width=7,
+)
 validate_dynamic_cut(cut, tree)
-packed = pack_canonical_tree(tree, target_exposed_clusters=4, max_depth=3)
-sub = tree.subtree(node_id)</code></pre>
-      <p>Every cut partitions the active leaf set exactly. Subtrees keep canonical IDs.</p>
+print(cut["top_partition_count"], cut["cut_optimizer"])
+# cut_optimizer should be calinski_harabasz_score</code></pre>
+
+      <h3>No saved matrix: Calinski–Harabasz on cophenetic distances</h3>
+      <p>This is a weaker input. It is still Calinski–Harabasz. It is <em>not</em> silhouette. Print that you used cophenetic distances so the fallback is visible.</p>
+      <pre><code>from scipy.cluster.hierarchy import cophenet
+from scipy.spatial.distance import squareform
+
+if "description_minilm_centered_cosine" in orchard.layer_matrices:
+    X = orchard.layer_matrices["description_minilm_centered_cosine"]
+    source = "saved MiniLM layer"
+else:
+    X = squareform(cophenet(tree.linkage))
+    source = "cophenetic distances (no saved layer matrix)"
+
+cut = build_dynamic_cut(
+    tree,
+    top_criterion="optimal",
+    cut_optimizer="calinski_harabasz_score",
+    feature_matrix=X,
+)
+print("optimal cut features:", source)
+print(cut["cut_optimizer"], cut["top_partition_count"])</code></pre>
+      <div class="callout warn">
+        <strong>Do not omit <code>feature_matrix</code>.</strong>
+        <p>With no matrix, <code>top_criterion="optimal"</code> currently selects silhouette on cophenetic distances. That silent switch is the wrong default — cut quality (and how useful the tree looks) changes a lot. Always pass <code>cut_optimizer="calinski_harabasz_score"</code> and a matrix.</p>
+      </div>
+      <p>Other named scorers exist (<code>silhouette_score</code>, <code>davies_bouldin_score</code>) only if you pass them on purpose. <code>cut_polarity=-1</code> flips “higher is better” for metrics like Davies–Bouldin. Default polarity is <code>1</code> (higher is better), which matches Calinski–Harabasz.</p>
+
+      <h3 id="cluster-count">2. <code>cluster_count</code></h3>
+      <p>You pick the number of top groups. No optimizer.</p>
+      <p><strong>Required:</strong> <code>cluster_count</code> (1 … number of leaves).<br />
+         <strong>Also required:</strong> <code>target_width</code> (must sit inside <code>min_width</code>…<code>max_width</code>).</p>
+      <pre><code>cut = build_dynamic_cut(
+    tree,
+    top_criterion="cluster_count",
+    cluster_count=4,
+    min_width=1,
+    max_width=8,
+    target_width=4,
+)</code></pre>
+
+      <h3 id="distance">3. <code>distance_threshold</code></h3>
+      <p>You pick a linkage height. Provide exactly one of:</p>
+      <ul>
+        <li><code>distance_threshold</code> — raw height</li>
+        <li><code>distance_threshold_normalized</code> — fraction of root height, in <code>[0, 1]</code></li>
+      </ul>
+      <pre><code>cut = build_dynamic_cut(
+    tree,
+    top_criterion="distance_threshold",
+    distance_threshold_normalized=0.4,
+    min_width=3,
+    max_width=7,
+    target_width=5,
+)</code></pre>
+
+      <h2>Width and depth</h2>
+      <table>
+        <thead>
+          <tr><th>Argument</th><th>Default</th><th>Role</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>min_width</code></td><td>3</td><td>Lower bound on groups at a cut.</td></tr>
+          <tr><td><code>max_width</code></td><td>7</td><td>Upper bound. Optimal search uses this as max k.</td></tr>
+          <tr><td><code>target_width</code></td><td>5</td><td>Preferred width for non-optimal subcuts. Optional when <code>optimal</code>.</td></tr>
+          <tr><td><code>max_depth</code></td><td>4</td><td>Stop recursing.</td></tr>
+          <tr><td><code>threshold_steps</code></td><td>32</td><td>How many candidate heights to try for non-optimal subcuts.</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="walk">Walk labels by level</h2>
+      <p>Use these while comparing trees, before or after labeling. If no label set is active, internal nodes show a short id and leaves show <code>item_id</code>.</p>
+
+      <h3>Whole tree, with or without leaves</h3>
+      <pre><code>from collections import defaultdict
+from orchard.tree import default_node_label
+
+def nodes_by_level(tree, include_leaves=True, label_set=None):
+    levels = defaultdict(list)
+
+    def walk(node_id, depth):
+        node = tree.node(node_id)
+        if include_leaves or node["kind"] != "leaf":
+            levels[depth].append(
+                (node_id, default_node_label(tree, node_id, label_set=label_set))
+            )
+        for child in node.get("children") or []:
+            walk(child, depth + 1)
+
+    walk(tree.root_node_id, 0)
+    return dict(levels)
+
+for depth, rows in sorted(nodes_by_level(tree, include_leaves=False).items()):
+    print(depth, [label for _node_id, label in rows])
+
+# include leaves (documents) at the bottom levels
+for depth, rows in sorted(nodes_by_level(tree, include_leaves=True).items()):
+    print(depth, [label for _node_id, label in rows])</code></pre>
+
+      <h3>Walk a cut</h3>
+      <p><code>walk_cut_json</code> is the built-in helper: nested dict of labels under the cut, optional <code>max_depth</code>.</p>
+      <pre><code>from orchard import walk_cut_json
+
+summary = walk_cut_json(cut, tree)                 # uses active label set, or ids
+summary = walk_cut_json(cut, tree, max_depth=2)    # stop early
+summary = walk_cut_json(cut, tree, label_set="intrinsic_v1")</code></pre>
+
+      <h2>Other views</h2>
+      <h3>Validate</h3>
+      <pre><code>from orchard import validate_dynamic_cut
+validate_dynamic_cut(cut, tree)   # exact leaf partition; canonical ids</code></pre>
+
+      <h3>Leaf groups at the top cut</h3>
+      <pre><code>from orchard import cut_partition_item_ids
+groups = cut_partition_item_ids(cut, tree)
+# list of lists of item_id; union is the full corpus, no overlap</code></pre>
+
+      <h3>Pack a presentation frontier</h3>
+      <pre><code>from orchard import pack_canonical_tree
+packed = pack_canonical_tree(tree, target_exposed_clusters=4, max_depth=3)</code></pre>
+
+      <h3>Subtree</h3>
+      <p>Same canonical IDs as the parent tree. You can cut a subtree the same way.</p>
+      <pre><code>sub = tree.subtree(node_id)</code></pre>
     </main>
   </div>
   <script src="assets/site.js"></script>

@@ -31,11 +31,69 @@
 </aside>
     <main class="content">
       <h1>Documents</h1>
-      <p>Every adapter normalizes to <code>Document</code>. Only <code>text</code> is required.</p>
+      <p class="lede">Every build starts from a finite list of documents. One document becomes one leaf in every tree.</p>
+
+      <div class="callout default">
+        <div class="kicker">Defaults</div>
+        <p>Only <code>text</code> is required. Missing <code>item_id</code> is generated stably from the text. Empty title and empty metadata are fine. The corpus cannot change after <code>build</code>.</p>
+      </div>
+
+      <h2>Load from a list</h2>
+      <p><strong>Input:</strong> a Python list of strings, dicts, or <code>Document</code> objects.<br />
+         <strong>Result:</strong> canonical <code>Document</code> records, ready for <code>OrchardBuilder.build</code>.</p>
+
+      <h3>List of strings</h3>
+      <pre><code>from orchard import OrchardBuilder
+
+documents = [
+    "Schedule a calendar reminder for tomorrow morning.",
+    "Send an email summary of the weekly status notes.",
+    "Create a task to review the draft proposal.",
+    "Find documents mentioning quarterly budget planning.",
+]
+orchard = OrchardBuilder().build(documents)</code></pre>
+      <p>Each string becomes <code>Document(text=...)</code>. IDs are hashed from the text.</p>
+
+      <h3>List of dicts</h3>
+      <pre><code>from orchard.adapters import documents_from_records
+
+documents = documents_from_records([
+    {"text": "Send an email digest.", "item_id": "mail-1", "title": "Digest"},
+    {"text": "Create a calendar event.", "item_id": "cal-1", "metadata": {"app_name": "calendar"}},
+])</code></pre>
+
+      <h3>List of Document objects</h3>
       <pre><code>from orchard import Document
 
-Document(text="Find related notes", title="Search", metadata={"topic": "notes"})</code></pre>
-      <p>Missing <code>item_id</code> values are generated stably from text. One document equals one leaf in every tree.</p>
+documents = [
+    Document(text="Find related notes", title="Search", metadata={"topic": "notes"}),
+    Document(text="Archive last week's mail", item_id="mail-archive"),
+]</code></pre>
+
+      <p><code>OrchardBuilder.build</code> accepts any of these forms directly. You do not have to wrap strings first.</p>
+
+      <h2>Fields</h2>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Required</th><th>Default</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>text</code></td><td>yes</td><td>—</td></tr>
+          <tr><td><code>item_id</code></td><td>no</td><td>stable hash of <code>text</code></td></tr>
+          <tr><td><code>title</code></td><td>no</td><td><code>""</code></td></tr>
+          <tr><td><code>metadata</code></td><td>no</td><td><code>{}</code></td></tr>
+          <tr><td><code>source</code></td><td>no</td><td><code>None</code></td></tr>
+        </tbody>
+      </table>
+      <p>IDs must be unique. Duplicate IDs raise. For the optional app-family layer, every document must have a non-empty <code>metadata[family_metadata_key]</code> — see <a href="building-trees.html#family">Building Trees</a>.</p>
+
+      <h2>Load from files</h2>
+      <p>Same destination: a list of <code>Document</code>. See <a href="adapters.html">Adapters</a> for CSV / JSON / JSONL / directory details.</p>
+      <pre><code>from orchard.adapters.loaders import load_documents
+
+docs = load_documents(documents)          # already a list: returned as Documents
+docs = load_documents("corpus.jsonl")
+docs = load_documents("notes/")           # directory of *.txt</code></pre>
     </main>
   </div>
   <script src="assets/site.js"></script>

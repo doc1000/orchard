@@ -126,3 +126,11 @@ Orchard ports the numerics; it does not import `tool_tree_demo`. Layer name
 | D-029 MiniLM description recalibration | `phase3b.py` `build_description_variants`, `_raw_cosine`, `_mapped_cosine`; `sentence_embedding_bridge.py` | `backends/minilm.py` `apply_description_transform`, `raw_cosine`, `mapped_cosine`, `MiniLMEmbeddingBackend` |
 | D-030 reduced profiles + variance-calibrated fusion | `phase3b.py` `variance_calibrated_fusion`; `phase3b_reduced_profiles.v1.json` | `backends/fusion.py` `variance_calibrated_fusion`; `assets/profiles/{semantic,domain,function}.json` |
 | D-031 G3 hierarchy: `D=1-S` / consume calibrated D; average linkage; no Ward | `phase4a.py` `_dissimilarity` | `backends/similarity.py` `linkage_from_dissimilarity`; `backends/fusion.py` `fuse_to_dissimilarity` |
+
+
+## Online default.  loud failure
+
+The default path should depend on modernbert, llm and miniLM.  the offline path should be for quick examples.  if are tree is set to be built with online parameters, it should fail loudly if they are not available.  It should never fail silently and shift to offline (we can create a message with offline option)
+
+## layer matrix defaults
+below_size_limit should be the default, instead of never.

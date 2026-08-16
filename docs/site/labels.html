@@ -31,13 +31,60 @@
 </aside>
     <main class="content">
       <h1>Labels</h1>
-      <p>Named label sets are presentation overlays. Contrastive labeling is out of scope for v1.</p>
-      <pre><code>from orchard import label_intrinsic, import_labels
+      <p class="lede">Labeling names nodes on a tree you already built. It does not change linkage. Do this before you judge a cut — without names there is little basis for saying the cut is good.</p>
+
+      <div class="callout default">
+        <div class="kicker">Defaults</div>
+        <p><code>build</code> does not label. There is no active label set until you create one. Intrinsic helper name: <code>"intrinsic_v1"</code>. Import helper name: <code>"imported"</code>. Both make the new set active unless you pass <code>make_active=False</code>. Contrastive / LLM labeling is not in v1.</p>
+      </div>
+
+      <h2>After build, before you trust a cut</h2>
+      <p>Linkage is the expensive commitment. Names are cheap overlays and never mutate it. Fingerprints can compare two linkages unlabeled. Reading whether a partition makes sense needs labels on the nodes — see <a href="cuts-and-views.html#walk">walk by level</a>.</p>
+      <ol class="steps">
+        <li>Build one or more trees.</li>
+        <li>Attach a named label set (this page).</li>
+        <li>Walk / cut / compare. Score cuts with Calinski–Harabasz.</li>
+      </ol>
+
+      <h2>Online vs offline labeling</h2>
+      <div class="split">
+        <div class="branch">
+          <h3>Online (intended)</h3>
+          <p>An LLM names internal nodes from member texts. MiniLM and ModernBERT are already used in <em>building</em>; the LLM is for this step. Orchard does not ship an LLM labeler in v1. Plug one in later as another named set.</p>
+        </div>
+        <div class="branch default">
+          <h3>Offline (available now)</h3>
+          <p><code>label_intrinsic</code> — short token summaries from titles/text, rolled up the tree. Or <code>import_labels</code> — you supply the strings.</p>
+        </div>
+      </div>
+
+      <h2>Intrinsic labels</h2>
+      <p><strong>Input:</strong> a <code>Tree</code> (documents attached help; leaves fall back to <code>item_id</code>).<br />
+         <strong>Procedure:</strong> leaves take a few words from title or text; parents merge child tokens.<br />
+         <strong>Result:</strong> a dict <code>node_id → str</code>, stored as a named set. Linkage fingerprint must not change.</p>
+      <pre><code>from orchard import label_intrinsic
 
 label_intrinsic(tree, name="intrinsic_v1")
-import_labels(tree, {tree.root_node_id: "All items"}, name="imported")
+tree.label_for(tree.root_node_id)          # active set
+# max_words=4 by default
+label_intrinsic(tree, name="short", max_words=2, make_active=False)</code></pre>
+
+      <h2>Import your own names</h2>
+      <pre><code>from orchard import import_labels
+
+import_labels(
+    tree,
+    {tree.root_node_id: "All items"},
+    name="imported",
+)
 tree.use_labels("imported")</code></pre>
-      <p>Switching or replacing label sets never mutates linkage, memberships, or canonical IDs.</p>
+      <p>Unknown node IDs raise. Extra nodes may be omitted; they just have no string in that set.</p>
+
+      <h2>Switch sets</h2>
+      <pre><code>tree.use_labels("intrinsic_v1")
+tree.use_labels("imported")
+tree.use_labels(None)          # no active names; walk helpers show ids</code></pre>
+      <p>Replacing a set never mutates linkage, memberships, or canonical IDs. Saved orchards store every named set under <code>trees/&lt;id&gt;/labels/</code>.</p>
     </main>
   </div>
   <script src="assets/site.js"></script>

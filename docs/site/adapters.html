@@ -31,6 +31,23 @@
 </aside>
     <main class="content">
       <h1>Adapters</h1>
+      <p class="lede">Adapters only turn files or records into <code>Document</code> lists. They do not build trees. For an in-memory list, see <a href="documents.html">Documents</a>.</p>
+
+      <div class="callout default">
+        <div class="kicker">Defaults</div>
+        <p>CSV text column is <code>text</code>; optional <code>item_id</code>, <code>title</code>, <code>source</code>; other columns become metadata. Directory glob is <code>*.txt</code>; file stem becomes <code>item_id</code> and title. Encoding <code>utf-8</code>.</p>
+      </div>
+
+      <h2>Dispatch helper</h2>
+      <pre><code>from orchard.adapters.loaders import load_documents
+
+docs = load_documents(records)         # list of str / dict / Document
+docs = load_documents("corpus.jsonl")
+docs = load_documents("corpus.json")
+docs = load_documents("corpus.csv")
+docs = load_documents("notes/")        # directory</code></pre>
+
+      <h2>Explicit loaders</h2>
       <pre><code>from orchard.adapters import (
     documents_from_csv,
     documents_from_directory,
@@ -38,12 +55,15 @@
     documents_from_jsonl,
     documents_from_records,
 )
-from orchard.adapters.loaders import load_documents
 
-docs = load_documents("corpus.jsonl")
+docs = documents_from_records([
+    "plain text item",
+    {"text": "Send an email digest.", "item_id": "mail-1"},
+])
 docs = documents_from_csv("corpus.csv")
-docs = documents_from_directory("notes/", glob="*.txt")</code></pre>
-      <p>All adapters feed <code>OrchardBuilder.build(...)</code>.</p>
+docs = documents_from_directory("notes/", glob="*.txt")
+docs = documents_from_jsonl("corpus.jsonl")</code></pre>
+      <p>All of these feed <code>OrchardBuilder.build(...)</code>.</p>
     </main>
   </div>
   <script src="assets/site.js"></script>

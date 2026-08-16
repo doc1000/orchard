@@ -31,13 +31,152 @@
 </aside>
     <main class="content">
       <h1>Taxonomies</h1>
-      <p>Defaults ship as replaceable JSON under <code>orchard/assets/taxonomies/</code>.</p>
-      <pre><code>from orchard import DomainTaxonomy, FunctionTaxonomy, TaxonomyModel
+      <p class="lede">A taxonomy is a label set plus a ModernBERT+logistic scorer. You usually <strong>write a new one and train the head</strong>. The packaged Domain / Function heads are a convenience, not the main workflow.</p>
+
+      <div class="callout default">
+        <div class="kicker">Primary path</div>
+        <p>1) Define labels (name + definition). 2) Encode texts with ModernBERT. 3) Fit logistic. 4) <code>load_head</code> onto the taxonomy. Training text is label descriptions, labelled documents/chunks, or both. Needs <code>orchard[taxonomy-ml]</code>.</p>
+      </div>
+
+      <h2>What you get</h2>
+      <p><code>taxonomy.transform(documents)</code> returns <code>[n, k]</code> probabilities (one row per document, one column per label). Orchard turns those rows into a similarity layer (default Jensen–Shannon) and builds a tree named after the taxonomy.</p>
+
+      <h2 id="create">Create a new taxonomy (tiny example)</h2>
+      <p>Same definition object for every path below. <code>cues</code> are optional extra training phrases for the description-only path. They are not the scorer.</p>
+      <pre><code>from orchard import TaxonomyModel
+
+topic = TaxonomyModel.from_definition({
+    "schema_version": "orchard_taxonomy_definition_v1",
+    "name": "topic",
+    "label_order": ["mail", "calendar"],
+    "labels": [
+        {
+            "label_id": "mail",
+            "name": "Mail",
+            "definition": "Email, inbox, threads, drafts, and messages.",
+            "cues": ["inbox", "reply-all", "email digest"],
+        },
+        {
+            "label_id": "calendar",
+            "name": "Calendar",
+            "definition": "Events, meetings, reminders, and scheduling.",
+            "cues": ["meeting", "reminder", "schedule"],
+        },
+    ],
+})
+topic.save("topic.json")   # optional; reload later with TaxonomyModel.load("topic.json")</code></pre>
+      <p><strong>Input:</strong> <code>name</code> (becomes the tree id), <code>label_order</code>, and per-label <code>name</code> + <code>definition</code>.<br />
+         <strong>Result:</strong> a <code>TaxonomyModel</code> with no head yet. Do not pass it to <code>OrchardBuilder</code> until you attach a ModernBERT head.</p>
+
+      <h2 id="train">Train the ModernBERT head</h2>
+      <p>One encoder, one logistic, same hyperparameters as the packaged heads. The two sources of training rows are independent — use either, or concatenate both.</p>
+      <pre><code>from sklearn.linear_model import LogisticRegression
+from orchard.backends.modernbert import ModernBERTFeatureBackend
+from orchard.backends.taxonomy_heads import HEAD_HYPERPARAMS, save_head
+
+encoder = ModernBERTFeatureBackend()
+
+def fit_head(texts, y):
+    features = encoder.encode(texts)
+    clf = LogisticRegression(
+        C=HEAD_HYPERPARAMS["C"],                    # 0.1
+        class_weight=HEAD_HYPERPARAMS["class_weight"],  # "balanced"
+        max_iter=HEAD_HYPERPARAMS["max_iter"],      # 1000
+        random_state=HEAD_HYPERPARAMS["random_state"],  # 20260725
+    )
+    clf.fit(features, y)
+    save_head("topic_head.npz", clf.coef_, clf.intercept_, clf.classes_.tolist())
+    return topic.load_head("topic_head.npz", encoder=encoder)</code></pre>
+      <p>After <code>load_head</code>, <code>taxonomy_transform</code> is <code>"modernbert_logistic"</code>. Save the npz; reload later without re-training.</p>
+
+      <h3 id="unsupervised">A. Unsupervised — label descriptions only</h3>
+      <p>No labelled corpus. Each label contributes its <code>name. definition</code> string, plus each cue as another row of the same class. ModernBERT sees the wording of the taxonomy itself.</p>
+      <pre><code>texts, y = [], []
+for label_id in topic.label_order:
+    lab = topic.labels[label_id]
+    texts.append(f"{lab.name}. {lab.definition}")
+    y.append(label_id)
+    for cue in lab.cues:
+        texts.append(cue)
+        y.append(label_id)
+
+fit_head(texts, y)
+# at least one row per class; cues help but are optional</code></pre>
+      <p><strong>Input:</strong> the definition you wrote above.<br />
+         <strong>Procedure:</strong> ModernBERT-encode those short texts → logistic.<br />
+         <strong>Result:</strong> <code>topic_head.npz</code> attached to <code>topic</code>.</p>
+
+      <h3 id="supervised">B. Supervised — labelled documents / chunks</h3>
+      <p>You already know the class of some texts. Encode those texts, not the label definitions.</p>
+      <pre><code>from orchard import Document
+
+chunks = [
+    Document(text="Send an email digest of the inbox.", item_id="a"),
+    Document(text="Reply-all to the thread.", item_id="b"),
+    Document(text="Create a meeting on Tuesday.", item_id="c"),
+    Document(text="Set a reminder for the offsite.", item_id="d"),
+]
+labels_by_item_id = {
+    "a": "mail",
+    "b": "mail",
+    "c": "calendar",
+    "d": "calendar",
+}
+
+texts, y = [], []
+for doc in chunks:
+    texts.append(f"{doc.title} {doc.text}".strip())
+    y.append(labels_by_item_id[doc.item_id])
+
+fit_head(texts, y)</code></pre>
+      <p><strong>Input:</strong> documents plus <code>item_id → label_id</code> (every value must be in <code>label_order</code>; at least two classes).<br />
+         <strong>Result:</strong> the same <code>topic_head.npz</code> / attached head.</p>
+
+      <h3 id="both">C. Both together (usual when you have any labels)</h3>
+      <p>Stack description rows and document rows, then fit once.</p>
+      <pre><code>texts, y = [], []
+
+for label_id in topic.label_order:
+    lab = topic.labels[label_id]
+    texts.append(f"{lab.name}. {lab.definition}")
+    y.append(label_id)
+    for cue in lab.cues:
+        texts.append(cue)
+        y.append(label_id)
+
+for doc in chunks:
+    texts.append(f"{doc.title} {doc.text}".strip())
+    y.append(labels_by_item_id[doc.item_id])
+
+fit_head(texts, y)</code></pre>
+
+      <h2>Build a tree with it</h2>
+      <pre><code>from orchard import OrchardBuilder
+
+orchard = OrchardBuilder(taxonomies=[topic]).build(chunks)
+tree = orchard.tree("topic")
+# custom names are taxonomy-JS only unless you set fusion weights —
+# see Building Trees → Set fusion weights</code></pre>
+      <p>Reload later without fitting again:</p>
+      <pre><code>from orchard.backends.modernbert import ModernBERTFeatureBackend
+
+topic = TaxonomyModel.load("topic.json")
+topic.load_head("topic_head.npz", encoder=ModernBERTFeatureBackend())</code></pre>
+
+      <h2 id="defaults">Using the packaged Domain / Function heads</h2>
+      <p>Skip training only if the AppWorld-style Domain / Function label sets match your documents. This is optional.</p>
+      <pre><code>from orchard import DomainTaxonomy, FunctionTaxonomy, OrchardBuilder
 
 domain = DomainTaxonomy.load_default()
 function = FunctionTaxonomy.load_default()
-custom = TaxonomyModel.load("path/to/domain.json")</code></pre>
-      <p>With <code>orchard[taxonomy-ml]</code> (or an injected encoder), default Domain/Function load packaged ModernBERT+logistic heads (<code>taxonomy_transform: "modernbert_logistic"</code>). Cue is the explicit offline fallback (<code>allow_offline_fallback=True</code> or a custom cue taxonomy). When MiniLM is also active, each named taxonomy tree fuses both JS layers with MiniLM and document TF-IDF. Optional <code>fit(documents, labels_by_item_id)</code> trains a replacement head.</p>
+orchard = OrchardBuilder(taxonomies=[domain, function]).build(documents)
+# same as OrchardBuilder().build(documents) when orchard[ml] is installed</code></pre>
+
+      <h2 id="offline">Offline lexical (rare)</h2>
+      <p>No ModernBERT. Cue-word overlap, or the old TF-IDF <code>taxonomy.fit(docs, labels)</code>. Almost never the right path when you can run ModernBERT. Explicit opt-in: <code>OrchardBuilder(allow_offline_fallback=True)</code> for packaged cue JSON, or pass a definition with no head (cue transform).</p>
+
+      <h2>How the scores become a tree</h2>
+      <p>Default similarity on taxonomy rows is Jensen–Shannon (<code>taxonomy_similarity="jensen_shannon"</code>). Alternative: <code>"cosine"</code>. Layer name: <code>{taxonomy_name}_raw_js</code> (or <code>{name}_cosine</code>). To mix that layer with MiniLM and TF-IDF, set weights explicitly — <a href="building-trees.html#weights">Building Trees</a>.</p>
     </main>
   </div>
   <script src="assets/site.js"></script>

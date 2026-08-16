@@ -31,14 +31,34 @@
 </aside>
     <main class="content">
       <h1>Extending Orchard</h1>
+      <p class="lede">Swap one stage at a time. Keep MiniLM (semantic) distinct from TF-IDF (lexical) and from ModernBERT (taxonomy features).</p>
+
+      <h2>Taxonomy scorer</h2>
       <ul>
-        <li>Swap taxonomy JSON or implement <code>transform(documents) -> ndarray</code></li>
-        <li>Pass a custom <code>embedding_backend</code> with <code>encode(texts) -> ndarray</code> (MiniLM default; <code>TfidfEmbeddingBackend()</code> is the lexical opt-in)</li>
-        <li>Override per-tree <code>SimilarityProfile</code> / weight maps; weights must sum to 1 (never silently repaired)</li>
-        <li>Set <code>family_metadata_key</code> to opt into <code>app_exact_match</code> (complete metadata required)</li>
-        <li>Diagnostic MiniLM: <code>description_transform="raw"|"whitened"|"centered_pc3"</code> (default stays <code>"centered"</code>)</li>
-        <li>Start from external linkage via <code>Tree.from_linkage</code></li>
-        <li>Add named label sets without rebuilding trees</li>
+        <li>Primary: define labels, train a ModernBERT+logistic head from descriptions and/or labelled chunks, <code>load_head</code> — <a href="taxonomies.html#create">Taxonomies</a>.</li>
+        <li>Optional: packaged Domain / Function heads.</li>
+        <li>Or implement <code>transform(documents) -&gt; ndarray</code> with a <code>name</code> and <code>label_order</code>.</li>
+      </ul>
+
+      <h2>Document embedding</h2>
+      <ul>
+        <li>Default online: <code>MiniLMEmbeddingBackend</code> (<code>encode(texts) -&gt; ndarray</code>).</li>
+        <li>Lexical opt-in: <code>TfidfEmbeddingBackend()</code>.</li>
+        <li>Any object with <code>encode(texts)</code> can be passed as <code>embedding_backend</code>.</li>
+      </ul>
+
+      <h2>Fusion and family</h2>
+      <ul>
+        <li>Override per-tree fusion with <code>profiles={tree_id: SimilarityProfile(name=..., weights={...})}</code>. Weights must sum to 1. See <a href="building-trees.html#weights">Set fusion weights</a>.</li>
+        <li><code>family_metadata_key</code> opts into <code>app_exact_match</code> (complete metadata required).</li>
+        <li>Diagnostic MiniLM: <code>description_transform="raw"|"whitened"|"centered_pc3"</code> (default stays <code>"centered"</code>).</li>
+      </ul>
+
+      <h2>Trees you did not build here</h2>
+      <ul>
+        <li><code>Tree.from_linkage</code> then <code>Orchard.from_trees</code>.</li>
+        <li>Named label sets without rebuilding (<a href="labels.html">Labels</a>).</li>
+        <li>Keep layer matrices if you will run Calinski–Harabasz cuts (<a href="persistence.html">Persistence</a>).</li>
       </ul>
       <p class="muted">See <code>CODE_MANIFEST.md</code> for the module map.</p>
     </main>

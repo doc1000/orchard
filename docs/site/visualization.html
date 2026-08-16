@@ -31,11 +31,33 @@
 </aside>
     <main class="content">
       <h1>Visualization</h1>
-      <p>Orchard emits Plotly-oriented data payloads without importing Plotly.</p>
-      <pre><code>from orchard import cut_to_plotly_structure, orchard_plotly_structures
+      <p class="lede">Orchard emits Plotly-oriented data payloads. It does not import Plotly. Labels are optional; unlabeled trees still plot using ids.</p>
 
-structure = cut_to_plotly_structure(tree, cut, cut_id="overview")
-multi = orchard_plotly_structures(orchard, {"domain": cut_a, "function": cut_b})</code></pre>
+      <div class="callout default">
+        <div class="kicker">Defaults</div>
+        <p>Display text comes from the active label set, or <code>default_node_label</code> (leaf <code>item_id</code> / short internal id). Build a cut first — see <a href="cuts-and-views.html">Cuts &amp; Views</a>.</p>
+      </div>
+
+      <h2>One tree + one cut</h2>
+      <pre><code>from orchard import build_dynamic_cut, cut_to_plotly_structure
+
+X = orchard.layer_matrices["description_minilm_centered_cosine"]
+cut = build_dynamic_cut(
+    tree,
+    top_criterion="optimal",
+    cut_optimizer="calinski_harabasz_score",
+    feature_matrix=X,
+)
+structure = cut_to_plotly_structure(tree, cut, cut_id="overview")</code></pre>
+
+      <h2>Several trees</h2>
+      <pre><code>from orchard import orchard_plotly_structures
+
+multi = orchard_plotly_structures(
+    orchard,
+    {"domain": cut_a, "function": cut_b},
+)</code></pre>
+      <p>For a nested label dict without Plotly, use <code>walk_cut_json</code> on <a href="cuts-and-views.html#walk">Cuts &amp; Views</a>.</p>
     </main>
   </div>
   <script src="assets/site.js"></script>

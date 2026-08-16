@@ -31,11 +31,58 @@
 </aside>
     <main class="content">
       <h1>Persistence</h1>
-      <p>Orchard saves a versioned artifact directory + manifest (not one giant JSON blob).</p>
-      <pre><code>orchard.save("artifacts/my_orchard")
+      <p class="lede">An Orchard saves as a versioned directory plus a manifest, not one giant JSON blob. Layer matrices are optional — keep them if you will run optimal cuts later.</p>
+
+      <div class="callout default">
+        <div class="kicker">Defaults</div>
+        <p>Always written: documents, each tree’s linkage + canonical nodes, named label sets, build metadata. Layer matrices: <code>layer_matrix_persist="never"</code> — they exist in memory after <code>build</code>, but <code>save</code> does not write them. For Calinski–Harabasz cuts after reload, use <code>"always"</code>.</p>
+      </div>
+
+      <h2>Save and load</h2>
+      <pre><code>from orchard import Orchard
+
+orchard.save("artifacts/my_orchard")
 loaded = Orchard.load("artifacts/my_orchard")</code></pre>
-      <p>Durable: documents, linkage, node registry, named label sets, build metadata.</p>
-      <p>Optional layer NPZ: <code>OrchardBuilder(layer_matrix_persist="always")</code> writes already-computed similarity matrices as <code>layer_matrices.npz</code>. Default policy is <code>never</code>.</p>
+      <p><strong>Input:</strong> a directory path (created if needed).<br />
+         <strong>Result:</strong> <code>manifest.json</code>, <code>documents.json</code>, <code>trees/&lt;tree_id&gt;/canonical_tree.json</code>, <code>linkage.json</code>, optional <code>labels/*.json</code>, optional <code>layer_matrices.npz</code>.</p>
+
+      <h2>Always durable</h2>
+      <ul>
+        <li>Normalized documents</li>
+        <li>Linkage (Z matrix + leaf order)</li>
+        <li>Canonical node registry</li>
+        <li>Named label sets and which set is active</li>
+        <li>Build metadata (<code>get_params()</code>, fusion weights, checksums)</li>
+      </ul>
+
+      <h2 id="layers">Layer matrices</h2>
+      <p>These are the <code>[n, n]</code> similarity layers computed during build (MiniLM, TF-IDF, taxonomy JS, optional app-family). Optimal cuts want them as <code>feature_matrix</code>. Recomputing MiniLM / ModernBERT just to cut is slow; saving the matrices is the fast path.</p>
+      <p>Set the policy on the builder. It is stored in orchard metadata and used at <code>save</code> time.</p>
+
+      <h3><code>never</code> (default)</h3>
+      <p>Do not write <code>layer_matrices.npz</code>. After <code>load</code>, <code>orchard.layer_matrices</code> is empty. You can still cut from linkage, but then you should pass cophenetic distances into Calinski–Harabasz explicitly — see <a href="cuts-and-views.html#feature-matrix">Cuts</a>.</p>
+      <pre><code>OrchardBuilder()  # layer_matrix_persist="never"</code></pre>
+
+      <h3><code>always</code> (recommended if you will cut)</h3>
+      <pre><code>from orchard import OrchardBuilder
+
+builder = OrchardBuilder(layer_matrix_persist="always")
+orchard = builder.build(documents)
+orchard.save("artifacts/my_orchard")
+# artifacts/my_orchard/layer_matrices.npz
+
+loaded = Orchard.load("artifacts/my_orchard")
+X = loaded.layer_matrices["description_minilm_centered_cosine"]</code></pre>
+
+      <h3><code>below_size_limit</code></h3>
+      <p>Write the NPZ only if total bytes ≤ 8 MiB. If larger, skip the file (same end state as <code>never</code> for that save). Checksums still stay in metadata.</p>
+      <pre><code>OrchardBuilder(layer_matrix_persist="below_size_limit")</code></pre>
+
+      <h3><code>compressed</code></h3>
+      <p>Always write, using <code>np.savez_compressed</code>. Smaller file, slower IO.</p>
+      <pre><code>OrchardBuilder(layer_matrix_persist="compressed")</code></pre>
+
+      <p>In-memory <code>orchard.layer_matrices</code> is filled by <code>build</code> regardless of policy. The policy only decides whether <code>save</code> keeps them.</p>
     </main>
   </div>
   <script src="assets/site.js"></script>

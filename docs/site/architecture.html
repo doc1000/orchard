@@ -31,21 +31,131 @@
 </aside>
     <main class="content">
       <h1>Architecture</h1>
-      <p><code>OrchardBuilder</code> builds durable trees. <code>Orchard</code> holds them. Cuts and subtrees are cheap views.</p>
+      <p class="lede">Orchard turns a fixed list of documents into persistent hierarchical trees. Building the tree and naming the nodes are two different jobs.</p>
+
+      <div class="callout default">
+        <div class="kicker">Defaults (online)</div>
+        <p>With <code>orchard[ml]</code> installed, <code>OrchardBuilder().build(documents)</code> builds named <code>domain</code> and <code>function</code> trees. Text similarity is MiniLM (semantic) fused with TF-IDF (lexical). Taxonomy scores come from packaged ModernBERT+logistic heads. Fusion mode is <code>variance_calibrated</code>. Labeling is off until you ask for it.</p>
+      </div>
+
+      <h2>Two jobs</h2>
+      <div class="split">
+        <div class="branch default">
+          <h3>1. Build the tree</h3>
+          <p>Documents → embeddings / taxonomy scores → similarity layers → fused matrix → SciPy linkage. The result is structure: who is near whom. Linkage does not depend on node names.</p>
+        </div>
+        <div class="branch">
+          <h3>2. Label the nodes</h3>
+          <p>Names are a presentation overlay. They never change linkage, memberships, or node IDs. Label <em>before</em> you judge a cut — without names there is little basis for saying a cut is good. An LLM is for this step, not for building the tree.</p>
+        </div>
+      </div>
+
+      <h2>Words that get confused</h2>
+      <table>
+        <thead>
+          <tr><th>Term</th><th>Meaning in Orchard</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Semantic embedding</strong></td>
+            <td>MiniLM vectors. Similar <em>meaning</em>. Default online text layer.</td>
+          </tr>
+          <tr>
+            <td><strong>Lexical embedding</strong></td>
+            <td>TF-IDF vectors. Similar <em>words</em>. Layer name <code>tfidf_cosine</code>. Not semantic.</td>
+          </tr>
+          <tr>
+            <td><strong>Taxonomy</strong></td>
+            <td>A label set plus a scorer. Each document gets a distribution over those labels. Online default is ModernBERT+logistic. Offline is cue words or a fitted TF-IDF logistic head.</td>
+          </tr>
+          <tr>
+            <td>Tree named <code>"semantic"</code></td>
+            <td>The no-taxonomy tree. Its embedding may be MiniLM, TF-IDF, or both. The name does not mean “semantic embedding.”</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>How a tree is built</h2>
+      <p>Each split below is a real choice. Online defaults are marked.</p>
+
+      <div class="flow">
+        <div class="flow-step">
+          <div class="title">1. Documents</div>
+          <p>A list of texts (or <code>Document</code> records). One document = one leaf. Corpus is fixed; you cannot add or remove items later.</p>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+          <div class="title">2. Text embedding — pick one path</div>
+          <div class="split">
+            <div class="branch default">
+              <h3>Semantic (online default)</h3>
+              <p>MiniLM (<code>MiniLMEmbeddingBackend</code>). Layer: <code>description_minilm_centered_cosine</code>.</p>
+            </div>
+            <div class="branch">
+              <h3>Lexical (offline / explicit)</h3>
+              <p>TF-IDF (<code>TfidfEmbeddingBackend</code>). Layer: <code>tfidf_cosine</code>. Overlapping tokens, not meaning.</p>
+            </div>
+          </div>
+          <p class="muted">Default fused trees use <em>both</em> layers (MiniLM 0.66 / TF-IDF 0.34 on the no-taxonomy tree; taxonomy trees mix MiniLM, TF-IDF, and taxonomy JS). A TF-IDF-only tree is an explicit opt-in.</p>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+          <div class="title">3. Optional taxonomy scores — pick one path</div>
+          <div class="split">
+            <div class="branch default">
+              <h3>Online: ModernBERT classifier</h3>
+              <p>Train your own head from label descriptions and/or labelled chunks, or load the packaged Domain / Function heads. <code>taxonomy_transform: "modernbert_logistic"</code>. Needs <code>orchard[taxonomy-ml]</code>. See <a href="taxonomies.html">Taxonomies</a>.</p>
+            </div>
+            <div class="branch">
+              <h3>Offline: lexical taxonomy</h3>
+              <p>Cue-word overlap, or <code>fit()</code> a TF-IDF + logistic head on your labels. No ModernBERT.</p>
+            </div>
+          </div>
+          <p class="muted">Or skip taxonomies: <code>taxonomies=[]</code> builds only the no-taxonomy tree named <code>semantic</code>.</p>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+          <div class="title">4. Independent similarity layers</div>
+          <p>Each signal becomes its own <code>[n, n]</code> matrix. Do not concatenate MiniLM, TF-IDF, and taxonomy into one feature vector. Optional: keep these matrices on disk (<code>layer_matrix_persist</code>) so later cuts can score Calinski–Harabasz without recomputing embeddings.</p>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+          <div class="title">5. Fuse (if more than one layer)</div>
+          <p>Weighted mix of the matrices. Default mode: <code>variance_calibrated</code> (needs n≥3). Alternative: <code>raw_convex</code>. Weights must already sum to 1.</p>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+          <div class="title">6. Linkage → Tree</div>
+          <p>Dissimilarity <code>D = 1 − S</code>, then average linkage. Canonical node IDs are assigned. No labels yet.</p>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+          <div class="title">7. Label (separate from build)</div>
+          <p>Intrinsic heuristic, imported names, or (later) an LLM. Switching label sets does not rebuild the tree. See <a href="labels.html">Labels</a>.</p>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+          <div class="title">8. Inspect, cut, compare</div>
+          <p>Walk levels, cut, and compare. Fingerprints work without names; <em>reading</em> whether a cut is good does not. Score cuts with Calinski–Harabasz. See <a href="building-trees.html#compare">Building Trees</a> and <a href="cuts-and-views.html">Cuts &amp; Views</a>.</p>
+        </div>
+      </div>
+
       <h2>Core objects</h2>
       <ul>
-        <li><strong>Document</strong> — shared corpus leaf (<code>item_id</code>, <code>text</code>, …)</li>
-        <li><strong>Tree</strong> — SciPy linkage + canonical node IDs + named label sets</li>
-        <li><strong>Orchard</strong> — multi-tree collection over one corpus</li>
-        <li><strong>TaxonomyModel</strong> — input signal; one tree per taxonomy name</li>
+        <li><strong>Document</strong> — one corpus item (<code>item_id</code>, <code>text</code>, optional title/metadata).</li>
+        <li><strong>TaxonomyModel</strong> — a label set plus <code>transform(documents) → [n, k]</code> scores. Input to a tree, not the tree itself.</li>
+        <li><strong>Tree</strong> — SciPy linkage + canonical node IDs + optional named label sets.</li>
+        <li><strong>Orchard</strong> — one shared corpus and one or more named trees.</li>
+        <li><strong>OrchardBuilder</strong> — the only public construction verb is <code>build</code> (not <code>fit_transform</code>).</li>
       </ul>
-      <h2>Rules</h2>
+
+      <h2>Rules that do not change</h2>
       <ul>
-        <li>Public construction verb is <code>build</code>, not <code>fit_transform</code></li>
-        <li>Per-tree fusion (MiniLM + TF-IDF + taxonomy JS; optional <code>app_exact_match</code>); no orchard tree named <code>fused</code> / <code>mixed</code></li>
-        <li>Independent <code>[n,n]</code> layers — do not concatenate feature vectors</li>
-        <li>Labels never mutate linkage</li>
-        <li>Incremental corpus mutation is unsupported</li>
+        <li>There is no tree named <code>fused</code> or <code>mixed</code>. Fusion happens <em>inside</em> each named tree.</li>
+        <li>ModernBERT is the taxonomy encoder. It is not the document embedding. MiniLM is the document embedding.</li>
+        <li>TF-IDF is lexical, not semantic.</li>
+        <li>Labels never mutate linkage.</li>
+        <li>The corpus cannot grow or shrink in place. Rebuild a new Orchard.</li>
       </ul>
     </main>
   </div>

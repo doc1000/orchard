@@ -7,6 +7,8 @@
   --muted: #9d9d9d;
   --accent: #3794ff;
   --code-bg: #2d2d2d;
+  --ok: #3d6b4f;
+  --warn: #8a5a1e;
   --font: "Segoe UI", "Helvetica Neue", sans-serif;
   --mono: "Cascadia Code", "Consolas", "Courier New", monospace;
 }
@@ -72,7 +74,7 @@ a:hover { text-decoration: underline; }
 }
 .content {
   padding: 2rem 2.5rem 4rem;
-  max-width: 860px;
+  max-width: 920px;
 }
 h1, h2, h3 { color: #fff; line-height: 1.25; }
 h1 { font-size: 1.8rem; margin-top: 0; }
@@ -80,6 +82,11 @@ h2 { font-size: 1.25rem; margin-top: 2rem; border-bottom: 1px solid var(--border
 h3 { font-size: 1.05rem; margin-top: 1.4rem; }
 p, li { color: var(--text); }
 .muted { color: var(--muted); }
+.lede {
+  color: var(--muted);
+  max-width: 68ch;
+  margin-top: 0;
+}
 pre, code {
   font-family: var(--mono);
   font-size: 0.92em;
@@ -106,8 +113,77 @@ th, td {
   border: 1px solid var(--border);
   padding: 0.45rem 0.65rem;
   text-align: left;
+  vertical-align: top;
 }
 th { background: var(--bg-side); color: #fff; }
+.callout {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  background: #252526;
+}
+.callout.default { border-left-color: #3d8a5a; }
+.callout.warn { border-left-color: #c28a3a; }
+.callout strong { color: #fff; }
+.kicker {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+.split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+  margin: 0.85rem 0 1.1rem;
+}
+.branch {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.8rem 0.95rem;
+  background: #252526;
+}
+.branch.default {
+  border-color: #3d8a5a;
+}
+.branch h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  border: 0;
+}
+.branch p:last-child { margin-bottom: 0; }
+.flow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 1rem 0 1.5rem;
+}
+.flow-step {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #252526;
+  padding: 0.75rem 0.95rem;
+}
+.flow-step .title {
+  font-weight: 650;
+  color: #fff;
+}
+.flow-arrow {
+  text-align: center;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  user-select: none;
+}
+ol.steps {
+  padding-left: 1.25rem;
+}
+ol.steps li { margin: 0.35rem 0; }
 @media (max-width: 800px) {
   .layout { grid-template-columns: 1fr; }
   .sidebar { position: relative; height: auto; }
