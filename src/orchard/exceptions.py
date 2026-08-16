@@ -23,6 +23,22 @@ class InvalidFusionError(OrchardError, ValueError):
     """Raised when fusion weights, layers, or calibrated variance are invalid."""
 
 
+class MissingOptionalDependencyError(OrchardError, ImportError):
+    """Raised when a selected backend requires an uninstalled extra.
+
+    Message must name the extra and the exact opt-in. Do not silently swap
+    MiniLM for TF-IDF and still call the tree neural.
+    """
+
+    def __init__(self, extra: str, message: str | None = None) -> None:
+        self.extra = extra
+        text = message or (
+            f"orchard[{extra}] is required. Install that extra, or opt in with "
+            "allow_offline_fallback=True or embedding_backend=TfidfEmbeddingBackend()."
+        )
+        super().__init__(text)
+
+
 class CorpusMutationUnsupportedError(OrchardError, NotImplementedError):
     """Raised when incremental insert/delete/mutation of a corpus is requested."""
 

@@ -15,6 +15,10 @@ dev = [
     "pytest>=8.4,<9",
     "ruff>=0.9,<1",
 ]
+embeddings = [
+    "torch>=2.2",
+    "transformers>=4.41",
+]
 
 [tool.ruff]
 line-length = 100
@@ -35,3 +39,6 @@ packages = ["src/orchard"]
 testpaths = ["tests"]
 addopts = "-q -p no:cacheprovider"
 pythonpath = ["src"]
+markers = [
+    "optional_model: live neural model; may use a local snapshot and is not required in CI",
+]

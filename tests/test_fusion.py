@@ -123,6 +123,7 @@ def test_tfidf_and_js_layers_fuse_with_exposed_weights() -> None:
     )
     builder = OrchardBuilder(
         taxonomies=[taxonomy],
+        embedding_backend=TfidfEmbeddingBackend(),
         include_semantic_with_taxonomies=True,
         fusion_mode="raw_convex",
         semantic_weights={"tfidf_cosine": 0.75, "domain_raw_js": 0.25},
@@ -135,19 +136,24 @@ def test_tfidf_and_js_layers_fuse_with_exposed_weights() -> None:
     }
     orchard = builder.build(documents)
     assert "semantic" in orchard.trees
-    default = OrchardBuilder(taxonomies=[]).build(documents)
+    default = OrchardBuilder(
+        taxonomies=[],
+        embedding_backend=TfidfEmbeddingBackend(),
+    ).build(documents)
     assert orchard.tree("semantic").linkage.tolist() != default.tree(
         "semantic"
     ).linkage.tolist()
 
 
-def test_default_semantic_profile_is_inspectable_and_single_layer() -> None:
-    builder = OrchardBuilder(taxonomies=[])
+def test_explicit_tfidf_semantic_profile_is_inspectable_and_single_layer() -> None:
+    builder = OrchardBuilder(
+        taxonomies=[],
+        embedding_backend=TfidfEmbeddingBackend(),
+    )
     params = builder.get_params()
     assert params["fusion_mode"] == "variance_calibrated"
     assert params["profiles"]["semantic"]["weights"] == {"tfidf_cosine": 1.0}
     assert params["profiles"]["semantic"]["fusion_mode"] == "variance_calibrated"
-    assert "fused" not in str(params).lower()
 
 
 def test_default_taxonomy_trees_match_js_only_path() -> None:
@@ -160,9 +166,12 @@ def test_default_taxonomy_trees_match_js_only_path() -> None:
         np.testing.assert_array_equal(orchard.tree(taxonomy.name).linkage, expected)
 
 
-def test_default_semantic_tree_matches_tfidf_only_path() -> None:
+def test_explicit_tfidf_semantic_tree_matches_tfidf_only_path() -> None:
     documents = load_documents()
-    orchard = OrchardBuilder(taxonomies=[]).build(documents)
+    orchard = OrchardBuilder(
+        taxonomies=[],
+        embedding_backend=TfidfEmbeddingBackend(),
+    ).build(documents)
     backend = TfidfEmbeddingBackend()
     features = backend.encode([document.text for document in orchard.documents])
     similarity = cosine_matrix(features, signed=False)

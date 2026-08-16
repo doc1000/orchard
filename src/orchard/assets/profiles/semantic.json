@@ -1,0 +1,18 @@
+{
+  "name": "semantic",
+  "schema_version": "orchard_semantic_profile_v1",
+  "fusion_mode": "variance_calibrated",
+  "weights": {
+    "description_minilm_centered_cosine": 0.66,
+    "tfidf_cosine": 0.34
+  },
+  "provenance": {
+    "decisions": ["D-029", "D-030"],
+    "source": "AppWorld Phase 3B no-app semantic pair (MiniLM-centered + document TF-IDF)",
+    "notes": [
+      "keyword_tfidf_cosine renamed to tfidf_cosine; layer is document-text TF-IDF.",
+      "No app_exact_match: these two weights already sum to 1.",
+      "Default description transform is corpus-center then signed cosine (S+1)/2."
+    ]
+  }
+}

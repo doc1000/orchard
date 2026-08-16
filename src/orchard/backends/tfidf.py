@@ -39,7 +39,12 @@ def tfidf_matrix(texts: Sequence[str]) -> tuple[np.ndarray, list[str]]:
 
 @dataclass
 class TfidfEmbeddingBackend:
-    """Inspectable offline embedding backend used as OrchardBuilder default."""
+    """Inspectable offline lexical backend.
+
+    Semantic default is MiniLM when ``orchard[embeddings]`` is present.
+    Pass this class explicitly, or set ``allow_offline_fallback=True``, for
+    a TF-IDF-only semantic tree.
+    """
 
     vocabulary_: list[str] = field(default_factory=list, init=False, repr=False)
 

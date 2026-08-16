@@ -13,6 +13,7 @@ from orchard.adapters import (
     documents_from_records,
 )
 from orchard.adapters.loaders import load_documents
+from orchard.backends.tfidf import TfidfEmbeddingBackend
 
 
 def test_adapters_normalize_and_feed_build(tmp_path: Path) -> None:
@@ -48,5 +49,8 @@ def test_adapters_normalize_and_feed_build(tmp_path: Path) -> None:
     assert len(documents_from_directory(dir_path)) == 4
 
     docs = load_documents(jsonl_path)
-    orchard = OrchardBuilder(taxonomies=[]).build(docs)
+    orchard = OrchardBuilder(
+        taxonomies=[],
+        embedding_backend=TfidfEmbeddingBackend(),
+    ).build(docs)
     assert orchard.tree("semantic").leaf_count == 4

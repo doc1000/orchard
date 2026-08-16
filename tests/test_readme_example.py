@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from orchard import OrchardBuilder
+from orchard.backends.tfidf import TfidfEmbeddingBackend
 
 
 def test_readme_minimal_example() -> None:
@@ -26,7 +27,10 @@ def test_readme_semantic_corner() -> None:
         "Create a task to review the draft proposal.",
         "Find documents mentioning quarterly budget planning.",
     ]
-    orchard = OrchardBuilder(taxonomies=[]).build(documents)
+    orchard = OrchardBuilder(
+        taxonomies=[],
+        embedding_backend=TfidfEmbeddingBackend(),
+    ).build(documents)
     semantic = orchard.tree("semantic")
     assert semantic.tree_id == "semantic"
     assert semantic.leaf_count == 4

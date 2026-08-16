@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal, Mapping, Sequence
+from typing import Any, Literal
 
 import numpy as np
 
+from orchard.assets.profiles import load_semantic_weights
 from orchard.backends.fusion import (
     FUSION_MODES,
     SimilarityProfile,
@@ -18,6 +20,17 @@ from orchard.backends.layers import (
     TaxonomyCosineLayer,
     TaxonomyJsLayer,
     TfidfCosineLayer,
+)
+from orchard.backends.minilm import (
+    DESCRIPTION_TRANSFORMS,
+    MINILM_MODEL_ID,
+    MINILM_REVISION,
+    SENTENCE_CONFIG,
+    MiniLMCosineLayer,
+    MiniLMEmbeddingBackend,
+    embeddings_extra_available,
+    layer_name_for_transform,
+    missing_embeddings_error,
 )
 from orchard.backends.similarity import (
     cosine_matrix,
@@ -64,8 +77,12 @@ class OrchardBuilder:
     """Build an Orchard from a finite corpus.
 
     Branching:
-    - default / ``None`` taxonomies → packaged Domain + Function trees.
-    - ``taxonomies == []`` → one ``semantic`` tree (default TF-IDF cosine path).
+    - default / ``None`` taxonomies → packaged Domain + Function trees (cue/JS).
+    - ``taxonomies == []`` → one ``semantic`` tree. Default is MiniLM-centered
+      cosine fused with document TF-IDF (0.66 / 0.34, variance_calibrated) when
+      ``orchard[embeddings]`` is installed or a MiniLM backend is injected.
+      TF-IDF-only is explicit: ``TfidfEmbeddingBackend()`` or
+      ``allow_offline_fallback=True``.
     - explicit non-empty ``taxonomies`` → one named tree per taxonomy.
 
     No fused Domain+Function+semantic default tree.
@@ -74,6 +91,7 @@ class OrchardBuilder:
 
     taxonomies: Any = field(default=_UNSET)
     embedding_backend: Any | None = None
+    lexical_backend: Any | None = None
     linkage_method: str = "average"
     semantic_signed_cosine: bool = False
     taxonomy_similarity: str = "jensen_shannon"
@@ -82,7 +100,10 @@ class OrchardBuilder:
     profiles: Mapping[str, SimilarityProfile | Mapping[str, float]] | None = None
     semantic_weights: Mapping[str, float] | None = None
     taxonomy_weights: Mapping[str, Mapping[str, float]] | None = None
+    allow_offline_fallback: bool = False
+    description_transform: str = "centered"
     metadata: dict[str, Any] = field(default_factory=dict)
+    _offline_fallback: bool = field(init=False, repr=False, default=False)
 
     def __post_init__(self) -> None:
         if self.taxonomy_similarity not in {"jensen_shannon", "cosine"}:
@@ -93,6 +114,11 @@ class OrchardBuilder:
             raise InvalidFusionError(
                 "fusion_mode must be 'variance_calibrated' or 'raw_convex'"
             )
+        if self.description_transform not in DESCRIPTION_TRANSFORMS:
+            raise InvalidIdentityError(
+                "description_transform must be one of: "
+                + ", ".join(DESCRIPTION_TRANSFORMS)
+            )
         if self.taxonomies is _UNSET or self.taxonomies is None:
             self.taxonomies = default_taxonomies()
         else:
@@ -100,15 +126,21 @@ class OrchardBuilder:
         names = [validate_tree_id(taxonomy.name) for taxonomy in self.taxonomies]
         if len(names) != len(set(names)):
             raise InvalidIdentityError("taxonomy names must be unique tree ids")
-        if self.embedding_backend is None:
-            self.embedding_backend = TfidfEmbeddingBackend()
+        if self.lexical_backend is None:
+            self.lexical_backend = TfidfEmbeddingBackend()
+        self._resolve_embedding_backend()
         self.profiles = self._resolve_profiles()
 
     def get_params(self) -> dict[str, Any]:
         """Inspectable builder configuration (sklearn-style)."""
+        minilm_active = self._uses_minilm_semantic()
+        backend = self.embedding_backend
         return {
             "taxonomies": [taxonomy.name for taxonomy in self.taxonomies],
-            "embedding_backend": type(self.embedding_backend).__name__,
+            "embedding_backend": (
+                None if backend is None else type(backend).__name__
+            ),
+            "lexical_backend": type(self.lexical_backend).__name__,
             "linkage_method": self.linkage_method,
             "semantic_signed_cosine": self.semantic_signed_cosine,
             "taxonomy_similarity": self.taxonomy_similarity,
@@ -116,6 +148,10 @@ class OrchardBuilder:
             "fusion_mode": self.fusion_mode,
             "profiles": {
                 tree_id: profile.to_dict() for tree_id, profile in self.profiles.items()
+            },
+            "active_layers": {
+                tree_id: list(profile.weights)
+                for tree_id, profile in self.profiles.items()
             },
             "semantic_weights": (
                 None if self.semantic_weights is None else dict(self.semantic_weights)
@@ -127,6 +163,20 @@ class OrchardBuilder:
                     name: dict(weights)
                     for name, weights in self.taxonomy_weights.items()
                 }
+            ),
+            "allow_offline_fallback": self.allow_offline_fallback,
+            "description_transform": self.description_transform,
+            "offline_fallback": self._offline_fallback,
+            "model_id": (
+                getattr(backend, "model_id", MINILM_MODEL_ID) if minilm_active else None
+            ),
+            "model_revision": (
+                getattr(backend, "revision", MINILM_REVISION) if minilm_active else None
+            ),
+            "pooling": (
+                getattr(backend, "pooling", SENTENCE_CONFIG["pooling"])
+                if minilm_active
+                else None
             ),
             "metadata": dict(self.metadata),
         }
@@ -158,8 +208,9 @@ class OrchardBuilder:
     def _build_semantic_tree(self, documents: Sequence[Document]) -> Tree:
         profile = self.profiles["semantic"]
         if self._is_native_single_layer(profile, "tfidf_cosine"):
+            backend = self._tfidf_encode_backend()
             texts = [doc.text for doc in documents]
-            features = np.asarray(self.embedding_backend.encode(texts), dtype=np.float64)
+            features = np.asarray(backend.encode(texts), dtype=np.float64)
             if features.shape[0] != len(documents):
                 raise InvalidIdentityError(
                     "embedding backend row count must match documents"
@@ -249,10 +300,17 @@ class OrchardBuilder:
     def _layer_registry(self) -> LayerRegistry:
         layers: list[Any] = [
             TfidfCosineLayer(
-                backend=self.embedding_backend,
+                backend=self.lexical_backend,
                 signed=self.semantic_signed_cosine,
             )
         ]
+        if self._uses_minilm_semantic():
+            layers.append(
+                MiniLMCosineLayer(
+                    backend=self.embedding_backend,
+                    transform=self.description_transform,
+                )
+            )
         for taxonomy in self.taxonomies:
             layers.append(TaxonomyJsLayer(taxonomy=taxonomy))
             layers.append(TaxonomyCosineLayer(taxonomy=taxonomy))
@@ -275,10 +333,52 @@ class OrchardBuilder:
         if tree_id == "semantic":
             if self.semantic_weights is not None:
                 return dict(self.semantic_weights)
+            if self._uses_minilm_semantic():
+                return load_semantic_weights(
+                    minilm_layer=layer_name_for_transform(self.description_transform)
+                )
             return {"tfidf_cosine": 1.0}
         if self.taxonomy_weights is not None and tree_id in self.taxonomy_weights:
             return dict(self.taxonomy_weights[tree_id])
         return {self._native_taxonomy_layer(tree_id): 1.0}
+
+    def _needs_semantic(self) -> bool:
+        return (not self.taxonomies) or self.include_semantic_with_taxonomies
+
+    def _is_tfidf_backend(self, backend: Any) -> bool:
+        return isinstance(backend, TfidfEmbeddingBackend)
+
+    def _uses_minilm_semantic(self) -> bool:
+        if not self._needs_semantic() or self._offline_fallback:
+            return False
+        return not self._is_tfidf_backend(self.embedding_backend)
+
+    def _tfidf_encode_backend(self) -> Any:
+        if self._is_tfidf_backend(self.embedding_backend):
+            return self.embedding_backend
+        return self.lexical_backend
+
+    def _resolve_embedding_backend(self) -> None:
+        explicit = self.embedding_backend
+        if not self._needs_semantic():
+            if explicit is None:
+                self.embedding_backend = TfidfEmbeddingBackend()
+            self._offline_fallback = False
+            return
+        if explicit is None:
+            if embeddings_extra_available():
+                self.embedding_backend = MiniLMEmbeddingBackend()
+                self._offline_fallback = False
+                return
+            if self.allow_offline_fallback:
+                self.embedding_backend = TfidfEmbeddingBackend()
+                self._offline_fallback = True
+                return
+            raise missing_embeddings_error()
+        if self._is_tfidf_backend(explicit):
+            self._offline_fallback = False
+            return
+        self._offline_fallback = False
 
     def _coerce_profile(
         self,
